@@ -1,0 +1,13 @@
+# Ignore compilation directories and binaries
+build/
+*.bin
+*.elf
+build/
+
+# Ignore editor config files
+/.vscode/
+/.metadata/
+
+# Ignore system temp files
+*.DS_Store
+Thumbs.db
