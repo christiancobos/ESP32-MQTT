@@ -81,6 +81,18 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         		gpio_set_level(BLINK_GPIO_1, booleano);
         	}
+        	if(json_scanf(event->data, event->data_len, "{ greenLed: %B }", &booleano)==1)
+			{
+				ESP_LOGI(TAG, "greenLed: %s", booleano ? "true":"false");
+
+				gpio_set_level(BLINK_GPIO_2, booleano);
+			}
+        	if(json_scanf(event->data, event->data_len, "{ blueLed: %B }", &booleano)==1)
+			{
+				ESP_LOGI(TAG, "blueLed: %s", booleano ? "true":"false");
+
+				gpio_set_level(BLINK_GPIO_3, booleano);
+			}
         }
             break;
 
