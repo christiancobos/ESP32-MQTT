@@ -27,9 +27,10 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
 
     connect(_client, SIGNAL(connected()), this, SLOT(onMQTT_Connected()));    
     connect(_client, SIGNAL(received(const QMQTT::Message &)), this, SLOT(onMQTT_Received(const QMQTT::Message &)));
-    connect(_client, SIGNAL(subscribed(const QString &)), this, SLOT(onMQTT_subscribed(const QString &)));    
+    connect(_client, SIGNAL(subscribed(const QString &)), this, SLOT(onMQTT_subscribed(const QString &)));
 
-    connected=false;                 // Todavía no hemos establecido la conexión USB
+    connected=false;                 // Todavía no hemos establecido la conexión con el servidor MQTT
+    pingRequest = false;             // No se ha hecho solicitud de PING.
 }
 
 GUIPanel::~GUIPanel() // Destructor de la clase
@@ -89,77 +90,85 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
     bool previousblockinstate,checked;
     if (connected)
     {
-        //Deshacemos el escalado
-
-
         QJsonParseError error;
         QJsonDocument mensaje=QJsonDocument::fromJson(message.payload(),&error);
+        QString topic = message.topic();
 
         if ((error.error==QJsonParseError::NoError)&&(mensaje.isObject()))
         { //Tengo que comprobar que el mensaje es del tipo adecuado y no hay errores de parseo...
 
             QJsonObject objeto_json=mensaje.object();
-            QJsonValue entrada=objeto_json["redLed"]; //Obtengo la entrada redLed. Esto lo puedo hacer porque el operador [] está sobrecargado
-            QJsonValue entrada2=objeto_json["greenLed"]; //Obtengo la entrada orangeLed. Esto lo puedo hacer porque el operador [] está sobrecargado
-            QJsonValue entrada3=objeto_json["blueLed"]; //Obtengo la entrada greenLed. Esto lo puedo hacer porque el operador [] está sobrecargado
 
-
-            if (entrada.isBool())
-            {   //Compruebo que es booleano...
-
-                checked=entrada.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
-                previousblockinstate=ui->pushButton_2->blockSignals(true);   //Esto es para evitar que el cambio de valor
-                                                                     //provoque otro envio al topic por el que he recibido
-
-                ui->pushButton_2->setChecked(checked);
-                if (checked)
-                {
-                    ui->pushButton_2->setText("Apaga");
-
-                }
-                else
-                {
-                    ui->pushButton_2->setText("Enciende");
-                }
-                ui->pushButton_2->blockSignals(previousblockinstate);
-            }            
-            if (entrada2.isBool())
-            {   //Compruebo que es booleano...
-
-                checked=entrada2.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
-                previousblockinstate=ui->pushButton_3->blockSignals(true);   //Esto es para evitar que el cambio de valor
-                                                                     //provoque otro envio al topic por el que he recibido
-
-                ui->pushButton_3->setChecked(checked);
-                if (checked)
-                {
-                    ui->pushButton_3->setText("Apaga");
-
-                }
-                else
-                {
-                    ui->pushButton_3->setText("Enciende");
-                }
-                ui->pushButton_3->blockSignals(previousblockinstate);
+            if ((topic == (publishRootTopic + "/pong")) && (pingRequest == true))
+            {
+                pingRequest = false;
+                QMessageBox ventanaPopUp(QMessageBox::Information,tr("Evento"),tr("RESPUESTA A PING RECIBIDA"),QMessageBox::Ok,this,Qt::Popup);
+                ventanaPopUp.exec();
             }
-            if (entrada3.isBool())
-            {   //Compruebo que es booleano...
+            else
+            {
+                QJsonValue entrada=objeto_json["redLed"]; //Obtengo la entrada redLed. Esto lo puedo hacer porque el operador [] está sobrecargado
+                QJsonValue entrada2=objeto_json["greenLed"]; //Obtengo la entrada orangeLed. Esto lo puedo hacer porque el operador [] está sobrecargado
+                QJsonValue entrada3=objeto_json["blueLed"]; //Obtengo la entrada greenLed. Esto lo puedo hacer porque el operador [] está sobrecargado
 
-                checked=entrada3.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
-                previousblockinstate=ui->pushButton_4->blockSignals(true);   //Esto es para evitar que el cambio de valor
-                                                                     //provoque otro envio al topic por el que he recibido
 
-                ui->pushButton_4->setChecked(checked);
-                if (checked)
-                {
-                    ui->pushButton_4->setText("Apaga");
+                if (entrada.isBool())
+                {   //Compruebo que es booleano...
 
+                    checked=entrada.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
+                    previousblockinstate=ui->pushButton_2->blockSignals(true);   //Esto es para evitar que el cambio de valor
+                                                                         //provoque otro envio al topic por el que he recibido
+
+                    ui->pushButton_2->setChecked(checked);
+                    if (checked)
+                    {
+                        ui->pushButton_2->setText("Apaga");
+
+                    }
+                    else
+                    {
+                        ui->pushButton_2->setText("Enciende");
+                    }
+                    ui->pushButton_2->blockSignals(previousblockinstate);
                 }
-                else
-                {
-                    ui->pushButton_4->setText("Enciende");
+                if (entrada2.isBool())
+                {   //Compruebo que es booleano...
+
+                    checked=entrada2.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
+                    previousblockinstate=ui->pushButton_3->blockSignals(true);   //Esto es para evitar que el cambio de valor
+                                                                         //provoque otro envio al topic por el que he recibido
+
+                    ui->pushButton_3->setChecked(checked);
+                    if (checked)
+                    {
+                        ui->pushButton_3->setText("Apaga");
+
+                    }
+                    else
+                    {
+                        ui->pushButton_3->setText("Enciende");
+                    }
+                    ui->pushButton_3->blockSignals(previousblockinstate);
                 }
-                ui->pushButton_4->blockSignals(previousblockinstate);
+                if (entrada3.isBool())
+                {   //Compruebo que es booleano...
+
+                    checked=entrada3.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
+                    previousblockinstate=ui->pushButton_4->blockSignals(true);   //Esto es para evitar que el cambio de valor
+                                                                         //provoque otro envio al topic por el que he recibido
+
+                    ui->pushButton_4->setChecked(checked);
+                    if (checked)
+                    {
+                        ui->pushButton_4->setText("Apaga");
+
+                    }
+                    else
+                    {
+                        ui->pushButton_4->setText("Enciende");
+                    }
+                    ui->pushButton_4->blockSignals(previousblockinstate);
+                }
             }
         }
 
@@ -173,7 +182,9 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
  -----------------------------------------------------------*/
 void GUIPanel::onMQTT_Connected()
 {
-    QString topic(ui->topic->text());
+    suscribeRootTopic = ui->suscribe_topic->text();
+    publishRootTopic  = ui->publish_topic->text();
+
 
     ui->runButton->setEnabled(false);
 
@@ -182,12 +193,13 @@ void GUIPanel::onMQTT_Connected()
 
     connected=true;
 
-    _client->subscribe(topic,0); //Se suscribe al mismo topic en el que publica...
+    _client->subscribe(suscribeRootTopic,0);       //Se suscribe al mismo topic en el que publica
+    _client->subscribe(publishRootTopic + "/#",0); //Se suscribe a los hijos del topic de recepción padre y sus descendientes
 }
 
 
 
-void GUIPanel::SendMessage()
+void GUIPanel::SendMessage_LED()
 {
 
     QByteArray cadena;
@@ -201,9 +213,10 @@ void GUIPanel::SendMessage()
     //Añade un campo "greenLed" al objeto JSON, con el valor (true o false) contenido en checked
     objeto_json["blueLed"]=ui->pushButton_4->isChecked();
 
+
     QJsonDocument mensaje(objeto_json); //crea un objeto de tivo QJsonDocument conteniendo el objeto objeto_json (necesario para obtener el mensaje formateado en JSON)
 
-    QMQTT::Message msg(0, ui->topic->text(), mensaje.toJson()); //Crea el mensaje MQTT contieniendo el mensaje en formato JSON
+    QMQTT::Message msg(0, suscribeRootTopic, mensaje.toJson()); //Crea el mensaje MQTT contieniendo el mensaje en formato JSON
 
     //Publica el mensaje
     _client->publish(msg);
@@ -222,7 +235,7 @@ void GUIPanel::on_pushButton_2_toggled(bool checked)
     {
         ui->pushButton_2->setText("Enciende");
     }
-    SendMessage();
+    SendMessage_LED();
 }
 
 void GUIPanel::on_pushButton_4_toggled(bool checked)
@@ -237,12 +250,12 @@ void GUIPanel::on_pushButton_4_toggled(bool checked)
     {
         ui->pushButton_4->setText("Enciende");
     }
-    SendMessage();
+    SendMessage_LED();
 }
 
 void GUIPanel::on_pushButton_3_toggled(bool checked)
 {
-    //Orange
+    //Azul
     if (checked)
     {
         ui->pushButton_3->setText("Apaga");
@@ -252,5 +265,24 @@ void GUIPanel::on_pushButton_3_toggled(bool checked)
     {
         ui->pushButton_3->setText("Enciende");
     }
-    SendMessage();
+    SendMessage_LED();
+}
+
+void GUIPanel::on_pushButton_5_clicked(void)
+{
+    //Ping
+    QJsonObject objeto_json;
+
+    //Añade un campo "" al objeto JSON, con el valor true.
+    objeto_json["ping"]=true;
+
+    QJsonDocument mensaje(objeto_json); //crea un objeto de tivo QJsonDocument conteniendo el objeto objeto_json (necesario para obtener el mensaje formateado en JSON)
+
+    QMQTT::Message msg(0, suscribeRootTopic, mensaje.toJson()); //Crea el mensaje MQTT contieniendo el mensaje en formato JSON
+
+    //Publica el mensaje
+    _client->publish(msg);
+
+    //Activamos el flag de petición de PING pendiente
+    pingRequest = true;
 }

@@ -37,18 +37,23 @@ private slots:
 
     void on_pushButton_3_toggled(bool checked);
 
+    void on_pushButton_5_clicked(void);
+
 private: // funciones privadas
 //    void pingDevice();
     void startClient();
     void processError(const QString &s);
     void activateRunButton();
     void cambiaLEDs();
-    void SendMessage();
+    void SendMessage_LED();
 private:
     Ui::GUIPanel *ui;
     int transactionCount;
     QMQTT::Client *_client;
     bool connected;
+    bool pingRequest;
+    QString suscribeRootTopic;
+    QString publishRootTopic;
 };
 
 #endif // GUIPANEL_H

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>573</width>
-    <height>339</height>
+    <width>701</width>
+    <height>412</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -50,58 +50,6 @@
    </property>
    <property name="text">
     <string>Estado:</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>10</y>
-     <width>71</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>MQTT Broker</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_2">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>37</y>
-     <width>71</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Topic</string>
-   </property>
-  </widget>
-  <widget class="QLineEdit" name="leHost">
-   <property name="geometry">
-    <rect>
-     <x>100</x>
-     <y>10</y>
-     <width>164</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>broker.hivemq.com</string>
-   </property>
-  </widget>
-  <widget class="QLineEdit" name="topic">
-   <property name="geometry">
-    <rect>
-     <x>100</x>
-     <y>35</y>
-     <width>164</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>/mseei/imicro/jmcg/LED</string>
    </property>
   </widget>
   <widget class="QPushButton" name="pushButton_2">
@@ -176,6 +124,73 @@
    <property name="text">
     <string>OJO: No todos los campos JSON son interpretados por el código de partida en el microcontrolador</string>
    </property>
+  </widget>
+  <widget class="QPushButton" name="pushButton_5">
+   <property name="geometry">
+    <rect>
+     <x>160</x>
+     <y>100</y>
+     <width>101</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>PING</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>251</width>
+     <height>80</height>
+    </rect>
+   </property>
+   <layout class="QFormLayout" name="formLayout">
+    <item row="0" column="0">
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>MQTT Broker</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QLineEdit" name="leHost">
+      <property name="text">
+       <string>broker.hivemq.com</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>Subscribe topic</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QLineEdit" name="suscribe_topic">
+      <property name="text">
+       <string>/IntMic/cdcm/suscribe</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QLabel" name="label_4">
+      <property name="text">
+       <string>Publish topic</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QLineEdit" name="publish_topic">
+      <property name="text">
+       <string>/IntMic/cdcm/publish</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
