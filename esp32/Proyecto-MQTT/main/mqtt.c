@@ -24,12 +24,32 @@
 #include "frozen.h"
 
 //****************************************************************************
+//      DEFINES
+//****************************************************************************
+
+#define PONG_TOPIC "/pong"
+
+//****************************************************************************
+//      TIPOS DE DATOS
+//****************************************************************************
+
+typedef enum{
+    PING
+}mqtt_sendType_t;
+
+typedef struct{
+    mqtt_sendType_t messageType;
+    char payload[128];
+}mqtt_send_t; // Tipo de datos para comunicar al hilo de envío de datos el tipo de mensaje y su payload.
+
+//****************************************************************************
 //      VARIABLES GLOBALES STATIC
 //****************************************************************************
 
 static const char *TAG = "MQTT_CLIENT";
 static esp_mqtt_client_handle_t client=NULL;
 static TaskHandle_t senderTaskHandler=NULL;
+static QueueHandle_t sendQueueHandler=NULL;
 
 //****************************************************************************
 // Funciones.
@@ -51,6 +71,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             msg_id = esp_mqtt_client_subscribe(client, MQTT_TOPIC_SUBSCRIBE_BASE, 0);
             ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
             xTaskCreate(mqtt_sender_task, "mqtt_sender", 4096, NULL, 5, &senderTaskHandler); //Crea la tarea MQTT sennder
+            sendQueueHandler = xQueueCreate(10, sizeof(mqtt_send_t));
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -93,6 +114,16 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 				gpio_set_level(BLINK_GPIO_3, booleano);
 			}
+
+        	if(json_scanf(event->data, event->data_len, "{ ping: %B }", &booleano)==1)
+            {
+                ESP_LOGI(TAG, "ping received: %s", booleano ? "true":"false");
+
+                mqtt_send_t ping;
+                ping.messageType = PING;
+
+                xQueueSend(sendQueueHandler, &ping, portMAX_DELAY);
+            }
         }
             break;
 
@@ -111,21 +142,30 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 static void mqtt_sender_task(void *pvParameters)
 {
 	char buffer[100]; //"buffer" para guardar el mensaje. Me debo asegurar que quepa...
+	char output_topic[100]; //string para el topic de salida.
 	bool booleano=0;
 
 	while (1)
 	{
-		vTaskDelay(configTICK_RATE_HZ);
-		struct json_out out1 = JSON_OUT_BUF(buffer, sizeof(buffer)); // Inicializa la estructura que gestiona el buffer.
-																	// Hay que hacerlo cada vez para empezar a rellenar desde el principio
-																	// si quiero acumular varios "printf" en la misma cadena, no reinicio out1....
+	    mqtt_send_t msg;
+	    int msg_id;
+		struct json_out out1 = JSON_OUT_BUF(buffer, sizeof(buffer));
 		json_printf(&out1," { button: %B }",booleano);
 		booleano=!booleano;
 
-		int msg_id = esp_mqtt_client_publish(client, MQTT_TOPIC_PUBLISH_BASE, buffer, 0, 0, 0); //al utilizar la biblioteca Frozen, buffer es una cadena correctamente terminada con el caracter 0.
-																								//as� que puedo no indicar la longitud (cuarto par�metro vale 0).
-																								// Si fuese un puntero a datos binarios arbitr�rios, tendr�a que indicar la longitud de los datos en el cuarto par�metro de la funci�n.
-		ESP_LOGI(TAG, "sent successful, msg_id=%d: %s", msg_id, buffer);
+		if(xQueueReceive(sendQueueHandler, &msg, portMAX_DELAY) == pdTRUE){
+		    switch(msg.messageType){
+		    case PING:
+		        struct json_out out1 = JSON_OUT_BUF(buffer, sizeof(buffer)); // Inicializa la estructura que gestiona el buffer.
+		        json_printf(&out1," { ping: %B }",true);
+		        snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, PONG_TOPIC);
+		        msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
+		        ESP_LOGI(TAG, "PING sent successfully, msg_id=%d: %s, topic = %s", msg_id, buffer, output_topic);
+		        break;
+		    default:
+		        break;
+		    }
+		}
 	}
 }
 
