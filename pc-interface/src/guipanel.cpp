@@ -105,6 +105,21 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                 QMessageBox ventanaPopUp(QMessageBox::Information,tr("Evento"),tr("RESPUESTA A PING RECIBIDA"),QMessageBox::Ok,this,Qt::Popup);
                 ventanaPopUp.exec();
             }
+            else if (topic == (publishRootTopic + "/button_poll"))
+            {
+                QJsonValue entrada=objeto_json["button1"];
+                QJsonValue entrada2=objeto_json["button2"];
+
+                if (entrada.isBool())
+                {
+                    ui->led->setState(entrada.toBool());
+                }
+
+                if(entrada2.isBool())
+                {
+                    ui->led_2->setState(entrada2.toBool());
+                }
+            }
             else
             {
                 QJsonValue entrada=objeto_json["redLed"]; //Obtengo la entrada redLed. Esto lo puedo hacer porque el operador [] está sobrecargado
@@ -273,7 +288,7 @@ void GUIPanel::on_pushButton_5_clicked(void)
     //Ping
     QJsonObject objeto_json;
 
-    //Añade un campo "" al objeto JSON, con el valor true.
+    //Añade un campo "ping" al objeto JSON, con el valor true.
     objeto_json["ping"]=true;
 
     QJsonDocument mensaje(objeto_json); //crea un objeto de tivo QJsonDocument conteniendo el objeto objeto_json (necesario para obtener el mensaje formateado en JSON)
@@ -285,4 +300,21 @@ void GUIPanel::on_pushButton_5_clicked(void)
 
     //Activamos el flag de petición de PING pendiente
     pingRequest = true;
+}
+
+void GUIPanel::on_pushButton_6_clicked(void)
+{
+    // Sondeo de botones
+
+    QJsonObject objeto_json;
+
+    //Añade un campo "button_poll" al objeto JSON, con el valor true.
+    objeto_json["button_poll"]=true;
+
+    QJsonDocument mensaje(objeto_json); //crea un objeto de tivo QJsonDocument conteniendo el objeto objeto_json (necesario para obtener el mensaje formateado en JSON)
+
+    QMQTT::Message msg(0, suscribeRootTopic, mensaje.toJson()); //Crea el mensaje MQTT contieniendo el mensaje en formato JSON
+
+    //Publica el mensaje
+    _client->publish(msg);
 }
