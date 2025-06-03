@@ -41,6 +41,14 @@ private slots:
 
     void on_pushButton_6_clicked(void);
 
+    void on_checkBox_toggled(bool checked);
+
+    void on_Knob_valueChanged(double value);
+
+    void on_Knob_2_valueChanged(double value);
+
+    void on_Knob_3_valueChanged(double value);
+
 private: // funciones privadas
 //    void pingDevice();
     void startClient();
@@ -48,6 +56,7 @@ private: // funciones privadas
     void activateRunButton();
     void cambiaLEDs();
     void SendMessage_LED();
+    void SendMessage_General(QJsonObject objeto_json);
 private:
     Ui::GUIPanel *ui;
     int transactionCount;

@@ -21,7 +21,7 @@ CONFIG   +=qwt # Añadir para usar Qwidgets
 
 QT += widgets #Para QT4-->QT5
 
-CONFIG += qwt qmqtt analogwidgets colorwidgets embeddeduma
+CONFIG += qwt qmqtt analogwidgets colorwidgets embeddeduma qwtwidgets
 
 target.path    = "C:\MyApp"
 INSTALLS       = target

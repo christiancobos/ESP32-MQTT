@@ -31,6 +31,15 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
 
     connected=false;                 // Todavía no hemos establecido la conexión con el servidor MQTT
     pingRequest = false;             // No se ha hecho solicitud de PING.
+
+    // Se oculta el control PWM de los LED en el arranque
+    ui->Knob->setHidden(true);
+    ui->Knob_2->setHidden(true);
+    ui->Knob_3->setHidden(true);
+
+    ui->label_5->setHidden(true);
+    ui->label_6->setHidden(true);
+    ui->label_7->setHidden(true);
 }
 
 GUIPanel::~GUIPanel() // Destructor de la clase
@@ -212,7 +221,15 @@ void GUIPanel::onMQTT_Connected()
     _client->subscribe(publishRootTopic + "/#",0); //Se suscribe a los hijos del topic de recepción padre y sus descendientes
 }
 
+void GUIPanel::SendMessage_General(QJsonObject objeto_json)
+{
+    QJsonDocument mensaje(objeto_json); //crea un objeto de tivo QJsonDocument conteniendo el objeto objeto_json (necesario para obtener el mensaje formateado en JSON)
 
+    QMQTT::Message msg(0, suscribeRootTopic, mensaje.toJson()); //Crea el mensaje MQTT contieniendo el mensaje en formato JSON
+
+    //Publica el mensaje
+    _client->publish(msg);
+}
 
 void GUIPanel::SendMessage_LED()
 {
@@ -291,12 +308,7 @@ void GUIPanel::on_pushButton_5_clicked(void)
     //Añade un campo "ping" al objeto JSON, con el valor true.
     objeto_json["ping"]=true;
 
-    QJsonDocument mensaje(objeto_json); //crea un objeto de tivo QJsonDocument conteniendo el objeto objeto_json (necesario para obtener el mensaje formateado en JSON)
-
-    QMQTT::Message msg(0, suscribeRootTopic, mensaje.toJson()); //Crea el mensaje MQTT contieniendo el mensaje en formato JSON
-
-    //Publica el mensaje
-    _client->publish(msg);
+    SendMessage_General(objeto_json);
 
     //Activamos el flag de petición de PING pendiente
     pingRequest = true;
@@ -311,10 +323,107 @@ void GUIPanel::on_pushButton_6_clicked(void)
     //Añade un campo "button_poll" al objeto JSON, con el valor true.
     objeto_json["button_poll"]=true;
 
-    QJsonDocument mensaje(objeto_json); //crea un objeto de tivo QJsonDocument conteniendo el objeto objeto_json (necesario para obtener el mensaje formateado en JSON)
+    SendMessage_General(objeto_json);
+}
 
-    QMQTT::Message msg(0, suscribeRootTopic, mensaje.toJson()); //Crea el mensaje MQTT contieniendo el mensaje en formato JSON
+void GUIPanel::on_checkBox_toggled(bool checked)
+{
+    // Crear mensaje MQTT
+    QJsonObject objeto_json;
 
-    //Publica el mensaje
-    _client->publish(msg);
+    if (checked)
+    {
+        // Activar control PWM
+        ui->Knob->setEnabled(true);
+        ui->Knob_2->setEnabled(true);
+        ui->Knob_3->setEnabled(true);
+
+        ui->Knob->setHidden(false);
+        ui->Knob_2->setHidden(false);
+        ui->Knob_3->setHidden(false);
+
+        ui->label_5->setHidden(false);
+        ui->label_6->setHidden(false);
+        ui->label_7->setHidden(false);
+
+        // Desactivar control binario
+        ui->pushButton_2->setEnabled(false);
+        ui->pushButton_3->setEnabled(false);
+        ui->pushButton_4->setEnabled(false);
+
+        ui->pushButton_2->setHidden(true);
+        ui->pushButton_3->setHidden(true);
+        ui->pushButton_4->setHidden(true);
+
+        // Cambiar texto de check box
+        ui->checkBox->setText("Estado actual: Control PWM");
+
+        //Añade un campo "PWM_mode" al objeto JSON, con el valor true.
+        objeto_json["PWM_mode"]=true;
+    }
+    else
+    {
+        // Desactivar control PWM
+        ui->Knob->setEnabled(false);
+        ui->Knob_2->setEnabled(false);
+        ui->Knob_3->setEnabled(false);
+
+        ui->Knob->setHidden(true);
+        ui->Knob_2->setHidden(true);
+        ui->Knob_3->setHidden(true);
+
+        ui->label_5->setHidden(true);
+        ui->label_6->setHidden(true);
+        ui->label_7->setHidden(true);
+
+        // Activar control binario
+        ui->pushButton_2->setEnabled(true);
+        ui->pushButton_3->setEnabled(true);
+        ui->pushButton_4->setEnabled(true);
+
+        ui->pushButton_2->setHidden(false);
+        ui->pushButton_3->setHidden(false);
+        ui->pushButton_4->setHidden(false);
+
+        // Cambiar texto de check box
+        ui->checkBox->setText("Estado actual: Control ON/OFF");
+
+        //Añade un campo "PWM_mode" al objeto JSON, con el valor false.
+        objeto_json["PWM_mode"]=false;
+    }
+
+    SendMessage_General(objeto_json);
+}
+
+void GUIPanel::on_Knob_valueChanged(double value)
+{
+    // Crear mensaje MQTT
+    QJsonObject objeto_json;
+
+    //Añade un campo "PWM_Rojo" al objeto JSON, con el valor del knob para el led ROJO.
+    objeto_json["PWM_Rojo"]=int((value/100)*255);
+
+    SendMessage_General(objeto_json);
+}
+
+void GUIPanel::on_Knob_2_valueChanged(double value)
+{
+    // Crear mensaje MQTT
+    QJsonObject objeto_json;
+
+    //Añade un campo "PWM_Verde" al objeto JSON, con el valor del knob para el led Verde.
+    objeto_json["PWM_Verde"]=int((value/100)*255);
+
+    SendMessage_General(objeto_json);
+}
+
+void GUIPanel::on_Knob_3_valueChanged(double value)
+{
+    // Crear mensaje MQTT
+    QJsonObject objeto_json;
+
+    //Añade un campo "PWM_Azul" al objeto JSON, con el valor del knob para el led Azul.
+    objeto_json["PWM_Azul"]=int((value/100)*255);
+
+    SendMessage_General(objeto_json);
 }
