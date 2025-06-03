@@ -232,69 +232,6 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                     }
 
                 }
-
-                /*QJsonValue entrada=objeto_json["redLed"]; //Obtengo la entrada redLed. Esto lo puedo hacer porque el operador [] está sobrecargado
-                QJsonValue entrada2=objeto_json["greenLed"]; //Obtengo la entrada orangeLed. Esto lo puedo hacer porque el operador [] está sobrecargado
-                QJsonValue entrada3=objeto_json["blueLed"]; //Obtengo la entrada greenLed. Esto lo puedo hacer porque el operador [] está sobrecargado
-
-
-                if (entrada.isBool())
-                {   //Compruebo que es booleano...
-
-                    checked=entrada.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
-                    previousblockinstate=ui->pushButton_2->blockSignals(true);   //Esto es para evitar que el cambio de valor
-                                                                         //provoque otro envio al topic por el que he recibido
-
-                    ui->pushButton_2->setChecked(checked);
-                    if (checked)
-                    {
-                        ui->pushButton_2->setText("Apaga");
-
-                    }
-                    else
-                    {
-                        ui->pushButton_2->setText("Enciende");
-                    }
-                    ui->pushButton_2->blockSignals(previousblockinstate);
-                }
-                if (entrada2.isBool())
-                {   //Compruebo que es booleano...
-
-                    checked=entrada2.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
-                    previousblockinstate=ui->pushButton_3->blockSignals(true);   //Esto es para evitar que el cambio de valor
-                                                                         //provoque otro envio al topic por el que he recibido
-
-                    ui->pushButton_3->setChecked(checked);
-                    if (checked)
-                    {
-                        ui->pushButton_3->setText("Apaga");
-
-                    }
-                    else
-                    {
-                        ui->pushButton_3->setText("Enciende");
-                    }
-                    ui->pushButton_3->blockSignals(previousblockinstate);
-                }
-                if (entrada3.isBool())
-                {   //Compruebo que es booleano...
-
-                    checked=entrada3.toBool(); //Leo el valor de objeto (si fuese entero usaria toInt(), toDouble() si es doble....
-                    previousblockinstate=ui->pushButton_4->blockSignals(true);   //Esto es para evitar que el cambio de valor
-                                                                         //provoque otro envio al topic por el que he recibido
-
-                    ui->pushButton_4->setChecked(checked);
-                    if (checked)
-                    {
-                        ui->pushButton_4->setText("Apaga");
-
-                    }
-                    else
-                    {
-                        ui->pushButton_4->setText("Enciende");
-                    }
-                    ui->pushButton_4->blockSignals(previousblockinstate);
-                }*/
             }
         }
 

@@ -106,7 +106,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         	ESP_LOGI(TAG, "MQTT_EVENT_DATA: Topic %s",topic_name);
 
         	bool booleano;
-        	char string[128];
         	uint8_t PWM_value;
 
         	if(json_scanf(event->data, event->data_len, "{ redLed: %B }", &booleano)==1)
