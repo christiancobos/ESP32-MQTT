@@ -39,6 +39,12 @@ typedef enum{
     POLL
 }mqtt_sendType_t;
 
+typedef enum{
+    LED_ROJO,
+    LED_VERDE,
+    LED_AZUL
+} rgb_colourIndex_t;
+
 typedef struct{
     mqtt_sendType_t messageType;
     char payload[128];
@@ -52,6 +58,8 @@ static const char *TAG = "MQTT_CLIENT";
 static esp_mqtt_client_handle_t client=NULL;
 static TaskHandle_t senderTaskHandler=NULL;
 static QueueHandle_t sendQueueHandler=NULL;
+static uint8_t rgbPwmValues[3] = {0};
+static uint8_t binaryLEDValues[3] = {0};
 
 //****************************************************************************
 // Funciones.
@@ -98,9 +106,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         	ESP_LOGI(TAG, "MQTT_EVENT_DATA: Topic %s",topic_name);
 
         	bool booleano;
+        	uint8_t PWM_value;
+
         	if(json_scanf(event->data, event->data_len, "{ redLed: %B }", &booleano)==1)
         	{
         		ESP_LOGI(TAG, "redLed: %s", booleano ? "true":"false");
+
+        		binaryLEDValues[LED_ROJO] = booleano ? 1 : 0;
 
         		gpio_set_level(BLINK_GPIO_1, booleano);
         	}
@@ -108,11 +120,15 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			{
 				ESP_LOGI(TAG, "greenLed: %s", booleano ? "true":"false");
 
+				binaryLEDValues[LED_VERDE] = booleano ? 1 : 0;
+
 				gpio_set_level(BLINK_GPIO_2, booleano);
 			}
         	if(json_scanf(event->data, event->data_len, "{ blueLed: %B }", &booleano)==1)
 			{
 				ESP_LOGI(TAG, "blueLed: %s", booleano ? "true":"false");
+
+				binaryLEDValues[LED_AZUL] = booleano ? 1 : 0;
 
 				gpio_set_level(BLINK_GPIO_3, booleano);
 			}
@@ -129,7 +145,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         	if(json_scanf(event->data, event->data_len, "{ button_poll: %B }", &booleano)==1)
             {
-                //ESP_LOGI(TAG, "button poll request received: %s", booleano ? "true":"false");
+                ESP_LOGI(TAG, "button poll request received: %s", booleano ? "true":"false");
 
                 mqtt_send_t poll;
                 bool boton1, boton2;
@@ -141,10 +157,66 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 poll.payload[0] = boton1 ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
                 poll.payload[1] = boton2 ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
 
-                ESP_LOGI(TAG, "button read = %s, %s", boton1 ? "true":"false", boton2 ? "true":"false");
-
                 xQueueSend(sendQueueHandler, &poll, portMAX_DELAY);
             }
+
+            if(json_scanf(event->data, event->data_len, "{ PWM_mode: %B }", &booleano)==1)
+            {
+                ESP_LOGI(TAG, "LED mode request received: %s", booleano ? "true":"false");
+                if (!booleano)
+                {
+                    ESP_LOGI(TAG, "LED BINARY mode request received.");
+
+                    GL_stopLEDC();
+
+                    if (binaryLEDValues[LED_ROJO] == 1){
+                        gpio_set_level(BLINK_GPIO_1, true);
+                    }
+
+                    if (binaryLEDValues[LED_VERDE] == 1){
+                        gpio_set_level(BLINK_GPIO_2, true);
+                    }
+
+                    if (binaryLEDValues[LED_AZUL] == 1){
+                        gpio_set_level(BLINK_GPIO_3, true);
+                    }
+                }
+                else
+                {
+                    ESP_LOGI(TAG, "LED PWM mode request received.");
+
+                    GL_initLEDC();
+                }
+            }
+
+            if(json_scanf(event->data, event->data_len, "{ PWM_Rojo: %i }", &PWM_value) == 1)
+            {
+                ESP_LOGI(TAG, "LED ROJO valor: %d", PWM_value);
+
+                rgbPwmValues[0] = PWM_value;
+
+                GL_setRGB(rgbPwmValues);
+            }
+
+            if(json_scanf(event->data, event->data_len, "{ PWM_Verde: %i }", &PWM_value) == 1)
+            {
+                ESP_LOGI(TAG, "LED VERDE valor: %d", PWM_value);
+
+                rgbPwmValues[LED_VERDE] = PWM_value;
+
+                GL_setRGB(rgbPwmValues);
+            }
+
+            if(json_scanf(event->data, event->data_len, "{ PWM_Azul: %d }", &PWM_value) == 1)
+            {
+                ESP_LOGI(TAG, "LED AZUL valor: %d", PWM_value);
+
+                rgbPwmValues[LED_AZUL] = PWM_value;
+
+                GL_setRGB(rgbPwmValues);
+            }
+
+
 
         }
             break;
