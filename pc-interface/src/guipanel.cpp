@@ -31,6 +31,7 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
 
     connected=false;                 // Todavía no hemos establecido la conexión con el servidor MQTT
     pingRequest = false;             // No se ha hecho solicitud de PING.
+    updatingPWMControlInternally = false; // flag de actualización de controles de LED internos.
 
     // Se oculta el control PWM de los LED en el arranque
     ui->Knob->setHidden(true);
@@ -97,6 +98,7 @@ void GUIPanel::on_pushButton_clicked()
 void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
 {
     bool previousblockinstate,checked;
+    int  knobValue;
     if (connected)
     {
         QJsonParseError error;
@@ -131,7 +133,107 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
             }
             else
             {
-                QJsonValue entrada=objeto_json["redLed"]; //Obtengo la entrada redLed. Esto lo puedo hacer porque el operador [] está sobrecargado
+                QStringList keys = objeto_json.keys();
+
+                for (int i = 0; i < keys.count(); i++)
+                {
+                    QJsonValue entrada = objeto_json[keys[i]];
+
+                    if ((keys[i] == "redLed") && (entrada.isBool()))
+                    {
+                        checked=entrada.toBool();
+                        previousblockinstate=ui->pushButton_2->blockSignals(true);
+
+                        ui->pushButton_2->setChecked(checked);
+                        if (checked)
+                        {
+                            ui->pushButton_2->setText("Apaga");
+
+                        }
+                        else
+                        {
+                            ui->pushButton_2->setText("Enciende");
+                        }
+                        ui->pushButton_2->blockSignals(previousblockinstate);
+                    }
+                    else if ((keys[i] == "greenLed") && (entrada.isBool()))
+                    {
+                        checked=entrada.toBool();
+                        previousblockinstate=ui->pushButton_3->blockSignals(true);
+
+                        ui->pushButton_3->setChecked(checked);
+                        if (checked)
+                        {
+                            ui->pushButton_3->setText("Apaga");
+
+                        }
+                        else
+                        {
+                            ui->pushButton_3->setText("Enciende");
+                        }
+                        ui->pushButton_3->blockSignals(previousblockinstate);
+                    }
+                    else if ((keys[i] == "blueLed") && (entrada.isBool()))
+                    {
+                        checked=entrada.toBool();
+                        previousblockinstate=ui->pushButton_4->blockSignals(true);
+
+                        ui->pushButton_4->setChecked(checked);
+                        if (checked)
+                        {
+                            ui->pushButton_4->setText("Apaga");
+
+                        }
+                        else
+                        {
+                            ui->pushButton_4->setText("Enciende");
+                        }
+                        ui->pushButton_4->blockSignals(previousblockinstate);
+                    }
+                    else if ((keys[i] == "PWM_Rojo") && (entrada.isDouble()))
+                    {
+                        knobValue = entrada.toInt();
+                        previousblockinstate=ui->Knob->blockSignals(true);
+
+                        ui->Knob->setValue(int(((double(knobValue) / 255.0) * 100)));
+
+                        ui->Knob->blockSignals(previousblockinstate);
+                    }
+                    else if ((keys[i] == "PWM_Verde") && (entrada.isDouble()))
+                    {
+                        knobValue = entrada.toInt();
+                        previousblockinstate=ui->Knob_2->blockSignals(true);
+
+                        ui->Knob_2->setValue(int(((double(knobValue) / 255.0) * 100)));
+
+                        ui->Knob_2->blockSignals(previousblockinstate);
+                    }
+                    else if ((keys[i] == "PWM_Azul") && (entrada.isDouble()))
+                    {
+                        knobValue = entrada.toInt();
+                        previousblockinstate=ui->Knob_3->blockSignals(true);
+
+                        ui->Knob_3->setValue(int(((double(knobValue) / 255.0) * 100)));
+
+                        ui->Knob_3->blockSignals(previousblockinstate);
+                    }
+                    else if ((keys[i] == "PWM_mode") && (entrada.isBool()))
+                    {
+                        checked = entrada.toBool();
+                        updatingPWMControlInternally = true;
+
+                        ui->checkBox->setChecked(checked);
+
+                        updatingPWMControlInternally = false;
+                    }
+                    else
+                    {
+                        // do nothing
+                    }
+
+                }
+
+                /*QJsonValue entrada=objeto_json["redLed"]; //Obtengo la entrada redLed. Esto lo puedo hacer porque el operador [] está sobrecargado
                 QJsonValue entrada2=objeto_json["greenLed"]; //Obtengo la entrada orangeLed. Esto lo puedo hacer porque el operador [] está sobrecargado
                 QJsonValue entrada3=objeto_json["blueLed"]; //Obtengo la entrada greenLed. Esto lo puedo hacer porque el operador [] está sobrecargado
 
@@ -192,7 +294,7 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                         ui->pushButton_4->setText("Enciende");
                     }
                     ui->pushButton_4->blockSignals(previousblockinstate);
-                }
+                }*/
             }
         }
 
@@ -392,6 +494,8 @@ void GUIPanel::on_checkBox_toggled(bool checked)
         objeto_json["PWM_mode"]=false;
     }
 
+    if (updatingPWMControlInternally) // Para evitar que se envíe repetido un nuevo cambio en la checkbox cuando se está recibiendo el cambio por MQTT
+        return;
     SendMessage_General(objeto_json);
 }
 

@@ -63,6 +63,7 @@ private:
     QMQTT::Client *_client;
     bool connected;
     bool pingRequest;
+    bool updatingPWMControlInternally;
     QString suscribeRootTopic;
     QString publishRootTopic;
 };
