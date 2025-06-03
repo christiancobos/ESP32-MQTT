@@ -28,13 +28,15 @@
 //****************************************************************************
 
 #define PONG_TOPIC "/pong"
+#define POLL_TOPIC "/button_poll"
 
 //****************************************************************************
 //      TIPOS DE DATOS
 //****************************************************************************
 
 typedef enum{
-    PING
+    PING,
+    POLL
 }mqtt_sendType_t;
 
 typedef struct{
@@ -124,6 +126,26 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
                 xQueueSend(sendQueueHandler, &ping, portMAX_DELAY);
             }
+
+        	if(json_scanf(event->data, event->data_len, "{ button_poll: %B }", &booleano)==1)
+            {
+                //ESP_LOGI(TAG, "button poll request received: %s", booleano ? "true":"false");
+
+                mqtt_send_t poll;
+                bool boton1, boton2;
+                poll.messageType = POLL;
+
+                boton1 = gpio_get_level(GPIO_NUM_25);
+                boton2 = gpio_get_level(GPIO_NUM_26);
+
+                poll.payload[0] = boton1 ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
+                poll.payload[1] = boton2 ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
+
+                ESP_LOGI(TAG, "button read = %s, %s", boton1 ? "true":"false", boton2 ? "true":"false");
+
+                xQueueSend(sendQueueHandler, &poll, portMAX_DELAY);
+            }
+
         }
             break;
 
@@ -143,15 +165,11 @@ static void mqtt_sender_task(void *pvParameters)
 {
 	char buffer[100]; //"buffer" para guardar el mensaje. Me debo asegurar que quepa...
 	char output_topic[100]; //string para el topic de salida.
-	bool booleano=0;
 
 	while (1)
 	{
 	    mqtt_send_t msg;
 	    int msg_id;
-		struct json_out out1 = JSON_OUT_BUF(buffer, sizeof(buffer));
-		json_printf(&out1," { button: %B }",booleano);
-		booleano=!booleano;
 
 		if(xQueueReceive(sendQueueHandler, &msg, portMAX_DELAY) == pdTRUE){
 		    switch(msg.messageType){
@@ -160,7 +178,18 @@ static void mqtt_sender_task(void *pvParameters)
 		        json_printf(&out1," { ping: %B }",true);
 		        snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, PONG_TOPIC);
 		        msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
-		        ESP_LOGI(TAG, "PING sent successfully, msg_id=%d: %s, topic = %s", msg_id, buffer, output_topic);
+		        ESP_LOGI(TAG, "PING sent successfully, msg_id=%d: %s", msg_id, buffer);
+		        break;
+		    case POLL:
+		        struct json_out out2 = JSON_OUT_BUF(buffer, sizeof(buffer)); // Inicializa la estructura que gestiona el buffer.
+		        bool boton1, boton2;
+		        boton1 = msg.payload[0] == '1' ? true : false;
+		        boton2 = msg.payload[1] == '1' ? true : false;
+		        json_printf(&out2," { button1: %B , button2: %B }", boton1, boton2);
+		        snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, POLL_TOPIC);
+                msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
+                //ESP_LOGI(TAG, "Button poll sent successfully: button1 = %B, button2 = %B, msg_id=%d: %s", boton1, boton2, msg_id, buffer);
+
 		        break;
 		    default:
 		        break;

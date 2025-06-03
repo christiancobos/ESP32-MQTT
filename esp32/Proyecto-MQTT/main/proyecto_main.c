@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include "driver/ledc.h"
+#include "driver/gpio.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -188,6 +189,16 @@ void app_main(void)
 
 	//Inicializa el GPIO
 	GL_initGPIO(); //Inicializa los pines de salida
+
+	//Inicializa los pines de entrada de los botones.
+	gpio_config_t io_conf = {
+	    .pin_bit_mask = (1ULL << GPIO_NUM_25) | (1ULL << GPIO_NUM_26) ,
+	    .mode = GPIO_MODE_INPUT,
+	    .pull_up_en = GPIO_PULLUP_ENABLE,
+	    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+	    .intr_type = GPIO_INTR_DISABLE
+	};
+	gpio_config(&io_conf);
 
 	//
 	adc_simple_init();
