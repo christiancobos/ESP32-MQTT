@@ -186,7 +186,6 @@ void app_main(void)
 	}
 	ESP_ERROR_CHECK(ret);
 
-
 	//Inicializa el GPIO
 	GL_initGPIO(); //Inicializa los pines de salida
 

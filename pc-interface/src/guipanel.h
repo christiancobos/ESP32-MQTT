@@ -5,6 +5,14 @@
 #include <QtSerialPort/qserialport.h>
 #include "qmqtt.h"
 
+#include <qwt_plot_curve.h>
+#include <qwt_plot_grid.h>
+
+#define NMAX 300
+
+#define ADC_MAXVOLTAGE 3.6
+#define ADC_RESOLUTION 4096.0
+
 namespace Ui {
 class GUIPanel;
 }
@@ -66,6 +74,12 @@ private:
     bool updatingPWMControlInternally;
     QString suscribeRootTopic;
     QString publishRootTopic;
+
+    double xVal[NMAX];
+    double yVal1[NMAX];
+
+    QwtPlotGrid  *m_Grid;
+    QwtPlotCurve *m_curve_1;
 };
 
 #endif // GUIPANEL_H
