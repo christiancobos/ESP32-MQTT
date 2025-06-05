@@ -41,6 +41,29 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
     ui->label_5->setHidden(true);
     ui->label_6->setHidden(true);
     ui->label_7->setHidden(true);
+
+    //Configuramos la grafica
+    ui->qwtPlot->setTitle("Voltímetro");
+        ui->qwtPlot->setAxisTitle(QwtPlot::xBottom,"número de muestra");
+        ui->qwtPlot->setAxisTitle(QwtPlot::yLeft, "Volt");
+    //ui->qwtPlot->axisAutoScale(true); // Con Autoescala
+    ui->qwtPlot->setAxisScale(QwtPlot::yLeft, 0, 3.6); // Con escala definida
+    ui->qwtPlot->setAutoReplot(false);
+
+    //Creamos una curva y la añadimos a la grafica
+    m_curve_1 = new QwtPlotCurve();
+    m_curve_1->setPen(QPen(Qt::red));
+    m_Grid = new QwtPlotGrid();
+    m_Grid->attach(ui->qwtPlot);
+    m_curve_1->attach(ui->qwtPlot);
+
+    //Inicializadmos los datos que se muestran en la grafica
+    for (int i=0; i<NMAX; i++) {
+        yVal1[i]=0;
+        xVal[i]=i;
+    }
+    m_curve_1->setRawSamples(xVal,yVal1,NMAX);
+    ui->qwtPlot->replot();
 }
 
 GUIPanel::~GUIPanel() // Destructor de la clase
@@ -129,6 +152,19 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                 if(entrada2.isBool())
                 {
                     ui->led_2->setState(entrada2.toBool());
+                }
+            }
+            else if (topic == (publishRootTopic + "/adc_read"))
+            {
+                QJsonValue entrada = objeto_json["adc_read"];
+
+                if (entrada.isDouble())
+                {
+                    //Actualizamos gráfica correspondiente
+                    memmove(yVal1,yVal1+1,sizeof(double)*(NMAX-1)); //Desplazamos las muestras hacia la izquierda
+                    yVal1[NMAX-1]=3.6*entrada.toDouble()/4096.0; //Añadimos el último punto
+                    m_curve_1->setRawSamples(xVal,yVal1,NMAX);  //Refrescamos..
+                    ui->qwtPlot->replot();
                 }
             }
             else

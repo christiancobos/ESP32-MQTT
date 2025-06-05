@@ -15,6 +15,7 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "driver/gpio.h"
+#include "adc_simple.h"
 
 //Include own project  headers
 #include "gpio_leds.h"
@@ -29,6 +30,9 @@
 
 #define PONG_TOPIC "/pong"
 #define POLL_TOPIC "/button_poll"
+#define ADC_TOPIC  "/adc_read"
+
+#define ADC_SAMPLE_PERIOD 0.2f
 
 //****************************************************************************
 //      TIPOS DE DATOS
@@ -36,7 +40,8 @@
 
 typedef enum{
     PING,
-    POLL
+    POLL,
+    ADC_READ
 }mqtt_sendType_t;
 
 typedef enum{
@@ -66,6 +71,7 @@ static uint8_t binaryLEDValues[3] = {0};
 //****************************************************************************
 
 static void mqtt_sender_task(void *pvParameters);
+static void adc_task(void *pvParameters);
 
 
 // callback that will handle MQTT events. Will be called by  the MQTT internal task.
@@ -80,11 +86,24 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             msg_id = esp_mqtt_client_subscribe(client, MQTT_TOPIC_SUBSCRIBE_BASE, 0);
             ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-            xTaskCreate(mqtt_sender_task, "mqtt_sender", 4096, NULL, 5, &senderTaskHandler); //Crea la tarea MQTT sennder
-            sendQueueHandler = xQueueCreate(10, sizeof(mqtt_send_t));
+
+            //Crea la tarea MQTT sennder
+            if (xTaskCreate(mqtt_sender_task, "mqtt_sender", 4096, NULL, 5, &senderTaskHandler) != pdPASS)
+            {
+                while(1);
+            }
+
+            // Crea la tarea de sensado del ADC.
+            if (xTaskCreatePinnedToCore( adc_task, "Adc", configMINIMAL_STACK_SIZE + (0.5 * configMINIMAL_STACK_SIZE), NULL, tskIDLE_PRIORITY+1, NULL, 1 )!=pdPASS){
+                while (1);
+            }
+
+            sendQueueHandler = xQueueCreate(10, sizeof(mqtt_send_t));                        // Crea la cola para comunicar datos a la tarea de envío.
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+            vTaskDelete(mqtt_sender_task);
+            vTaskDelete(mqtt_sender_task);
             //Deber�amos destruir la tarea que env�a....
             break;
         case MQTT_EVENT_SUBSCRIBED:
@@ -260,14 +279,37 @@ static void mqtt_sender_task(void *pvParameters)
 		        json_printf(&out2," { button1: %B , button2: %B }", boton1, boton2);
 		        snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, POLL_TOPIC);
                 msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
-                //ESP_LOGI(TAG, "Button poll sent successfully: button1 = %B, button2 = %B, msg_id=%d: %s", boton1, boton2, msg_id, buffer);
-
+                ESP_LOGI(TAG, "Button poll sent successfully, msg_id=%d: %s", msg_id, buffer);
 		        break;
+		    case ADC_READ:
+		        struct json_out out3 = JSON_OUT_BUF(buffer, sizeof(buffer));
+		        uint16_t lectura;
+		        lectura = atoi(msg.payload);
+		        json_printf(&out3, " { adc_read: %u } ", lectura);
+		        snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, ADC_TOPIC);
+		        msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
+		        //ESP_LOGI(TAG, "ADC read sent successfully, msg_id=%d: %s", msg_id, buffer);
+		        break;
+
 		    default:
 		        break;
 		    }
 		}
 	}
+}
+
+void adc_task(void *pvParameters){
+    mqtt_send_t adc_read;
+    adc_read.messageType = ADC_READ;
+
+    for(;;)
+    {
+        int lectura = adc_simple_read_raw();
+        ESP_LOGI(TAG, "ADC read is %d", lectura );
+        sprintf(adc_read.payload, "%u", adc_simple_read_raw());
+        xQueueSend(sendQueueHandler, &adc_read, portMAX_DELAY);
+        vTaskDelay((int)(ADC_SAMPLE_PERIOD*configTICK_RATE_HZ));
+    }
 }
 
 esp_err_t mqtt_app_start(const char* url)

@@ -132,11 +132,11 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>2</number>
    </property>
    <widget class="QWidget" name="LED_tab">
     <attribute name="title">
-     <string>Tab 1</string>
+     <string>Control RGB</string>
     </attribute>
     <widget class="QLabel" name="label_3">
      <property name="geometry">
@@ -195,7 +195,7 @@
       <set>Qt::AlignCenter</set>
      </property>
     </widget>
-    <widget class="QWidget" name="">
+    <widget class="QWidget" name="layoutWidget">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -312,7 +312,7 @@
    </widget>
    <widget class="QWidget" name="tab_2">
     <attribute name="title">
-     <string>Tab 2</string>
+     <string>Sondeo botones</string>
     </attribute>
     <widget class="QWidget" name="layoutWidget">
      <property name="geometry">
@@ -373,6 +373,21 @@
      </property>
     </widget>
    </widget>
+   <widget class="QWidget" name="tab">
+    <attribute name="title">
+     <string>Lectura ADC</string>
+    </attribute>
+    <widget class="QwtPlot" name="qwtPlot">
+     <property name="geometry">
+      <rect>
+       <x>49</x>
+       <y>20</y>
+       <width>551</width>
+       <height>200</height>
+      </rect>
+     </property>
+    </widget>
+   </widget>
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
@@ -381,6 +396,11 @@
    <class>LED</class>
    <extends>QWidget</extends>
    <header>LED.h</header>
+  </customwidget>
+  <customwidget>
+   <class>QwtPlot</class>
+   <extends>QFrame</extends>
+   <header>qwt_plot.h</header>
   </customwidget>
   <customwidget>
    <class>QwtKnob</class>
