@@ -10,6 +10,9 @@
 
 #define NMAX 300
 
+#define ADC_MAXVOLTAGE 3.6
+#define ADC_RESOLUTION 4096.0
+
 namespace Ui {
 class GUIPanel;
 }

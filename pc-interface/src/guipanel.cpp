@@ -47,7 +47,7 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
         ui->qwtPlot->setAxisTitle(QwtPlot::xBottom,"número de muestra");
         ui->qwtPlot->setAxisTitle(QwtPlot::yLeft, "Volt");
     //ui->qwtPlot->axisAutoScale(true); // Con Autoescala
-    ui->qwtPlot->setAxisScale(QwtPlot::yLeft, 0, 3.6); // Con escala definida
+    ui->qwtPlot->setAxisScale(QwtPlot::yLeft, 0, ADC_MAXVOLTAGE); // Con escala definida
     ui->qwtPlot->setAutoReplot(false);
 
     //Creamos una curva y la añadimos a la grafica
@@ -162,7 +162,7 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                 {
                     //Actualizamos gráfica correspondiente
                     memmove(yVal1,yVal1+1,sizeof(double)*(NMAX-1)); //Desplazamos las muestras hacia la izquierda
-                    yVal1[NMAX-1]=3.6*entrada.toDouble()/4096.0; //Añadimos el último punto
+                    yVal1[NMAX-1]=ADC_MAXVOLTAGE*entrada.toDouble()/ADC_RESOLUTION; //Añadimos el último punto
                     m_curve_1->setRawSamples(xVal,yVal1,NMAX);  //Refrescamos..
                     ui->qwtPlot->replot();
                 }
