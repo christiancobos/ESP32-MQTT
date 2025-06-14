@@ -28,9 +28,12 @@
 //      DEFINES
 //****************************************************************************
 
-#define PONG_TOPIC "/pong"
-#define POLL_TOPIC "/button_poll"
-#define ADC_TOPIC  "/adc_read"
+#define PONG_TOPIC       "/pong"
+#define POLL_TOPIC       "/button_poll"
+#define ADC_TOPIC        "/adc_read"
+#define LAST_WILL_TOPIC  "/last_will"
+
+#define LAST_WILL_LENGTH 13u
 
 #define ADC_SAMPLE_PERIOD 0.2f
 
@@ -41,7 +44,8 @@
 typedef enum{
     PING,
     POLL,
-    ADC_READ
+    ADC_READ,
+    LAST_WILL_MESSAGE
 }mqtt_sendType_t;
 
 typedef enum{
@@ -317,10 +321,21 @@ esp_err_t mqtt_app_start(const char* url)
 {
 	esp_err_t error;
 
+	char last_will_message[LAST_WILL_LENGTH] = "disconnected!";
+	char output_topic[100]; //string para el topic de TESTAMENTO.
+	snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, LAST_WILL_TOPIC);
+
+
 	if (client==NULL){
 
 		esp_mqtt_client_config_t mqtt_cfg = {
 				.broker.address.uri = MQTT_BROKER_URL,
+				.session.last_will.topic = output_topic,
+				.session.last_will.msg = last_will_message,
+				.session.last_will.msg_len = LAST_WILL_LENGTH,
+				.session.last_will.qos = 1,
+				.session.last_will.retain = true,
+				.session.keepalive = 30 // Configuramos los mensajes de Keep Alive cada 30 segundos para asegurar que el testamento llega en poco tiempo.
 		};
 		if(url[0] != '\0'){
 			mqtt_cfg.broker.address.uri= url;
