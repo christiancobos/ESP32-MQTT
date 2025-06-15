@@ -167,6 +167,22 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                     ui->qwtPlot->replot();
                 }
             }
+            else if (topic == (publishRootTopic + "/last_will"))
+            {
+                QJsonValue entrada = objeto_json["disconnected"];
+
+                if (entrada.isBool())
+                {
+                    if (entrada.toBool())
+                    {
+                        ui->statusLabel_2->setText("Desconectado");
+                    }
+                    else
+                    {
+                        ui->statusLabel_2->setText("Conectado");
+                    }
+                }
+            }
             else
             {
                 QStringList keys = objeto_json.keys();
