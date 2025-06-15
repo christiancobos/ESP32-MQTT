@@ -33,7 +33,7 @@
 #define ADC_TOPIC        "/adc_read"
 #define LAST_WILL_TOPIC  "/last_will"
 
-#define LAST_WILL_LENGTH 13u
+#define LAST_WILL_LENGTH 26u
 
 #define ADC_SAMPLE_PERIOD 0.2f
 
@@ -106,11 +106,19 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 while (1);
             }
 
+            // Enviamos mensaje de conexión en el topic de testamento para indicar a los clientes que la placa está conectada.
+            mqtt_send_t last_will;
+            last_will.messageType = LAST_WILL_MESSAGE;
+
+            xQueueSend(sendQueueHandler, &last_will, portMAX_DELAY);
+
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
             vTaskDelete(senderTaskHandler);
             vTaskDelete(adcTaskHandler);
+            vQueueDelete(sendQueueHandler);
+
             //Deber�amos destruir la tarea que env�a....
             break;
         case MQTT_EVENT_SUBSCRIBED:
@@ -297,6 +305,13 @@ static void mqtt_sender_task(void *pvParameters)
 		        msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
 		        ESP_LOGI(TAG, "ADC read sent successfully, msg_id=%d: %s", msg_id, buffer);
 		        break;
+		    case LAST_WILL_MESSAGE:
+		        struct json_out out4 = JSON_OUT_BUF(buffer, sizeof(buffer));
+		        json_printf(&out4, " { disconnected: %B } ", false);
+		        snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, LAST_WILL_TOPIC);
+                msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 1, true);
+                ESP_LOGI(TAG, "Connection flag sent successfully, msg_id=%d: %s", msg_id, buffer);
+		        break;
 
 		    default:
 		        break;
@@ -321,7 +336,7 @@ esp_err_t mqtt_app_start(const char* url)
 {
 	esp_err_t error;
 
-	char last_will_message[LAST_WILL_LENGTH] = "disconnected!";
+	char last_will_message[LAST_WILL_LENGTH] = " { \"disconnected\": true } ";
 	char output_topic[100]; //string para el topic de TESTAMENTO.
 	snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, LAST_WILL_TOPIC);
 
