@@ -49,6 +49,9 @@
 //TAG para los mensajes de consola
 static const char *TAG = "example";
 
+// Flag para la instalación de la rutina de interrupción.
+#define ESP_INTR_FLAG_DEFAULT 0
+
 
 /* Console command history can be stored to and loaded from a file.
  * The easiest way to do this is to use FATFS filesystem on top of
@@ -175,6 +178,9 @@ void ClockTask (void *pvparameters)
     }
 
 }
+
+
+
 void app_main(void)
 {
 
@@ -195,9 +201,19 @@ void app_main(void)
 	    .mode = GPIO_MODE_INPUT,
 	    .pull_up_en = GPIO_PULLUP_ENABLE,
 	    .pull_down_en = GPIO_PULLDOWN_DISABLE,
-	    .intr_type = GPIO_INTR_DISABLE
+	    .intr_type = GPIO_INTR_ANYEDGE
 	};
 	gpio_config(&io_conf);
+
+    //Instalar rutina de tratamiento de interrupciones de GPIO.
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    //Solución EF41: Anclar rutina a los pines seleccionados para los botones (GPIO25 y GPIO26)
+    gpio_isr_handler_add(GPIO_NUM_25, gpio_isr_handler, (void*) GPIO_NUM_25);
+    gpio_isr_handler_add(GPIO_NUM_26, gpio_isr_handler, (void*) GPIO_NUM_26);
+
+    // Deshabilitación inicial de interrupciones
+    gpio_intr_disable(GPIO_NUM_25);
+    gpio_intr_disable(GPIO_NUM_26);
 
 	//
 	adc_simple_init();
