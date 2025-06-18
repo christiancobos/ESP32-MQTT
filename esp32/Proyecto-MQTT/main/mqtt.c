@@ -47,7 +47,7 @@
 
 typedef enum{
     PING,
-    POLL,
+    BUTTON_STATUS,
     ADC_READ,
     LAST_WILL_MESSAGE
 }mqtt_sendType_t;
@@ -75,7 +75,7 @@ static QueueHandle_t sendQueueHandler=NULL;
 static uint8_t rgbPwmValues[3] = {0};
 static uint8_t binaryLEDValues[3] = {0};
 static bool botonIzquierdo, botonDerecho;
-static mqtt_send_t estadoBotonesISR;
+static volatile mqtt_send_t estadoBotonesISR;
 
 //****************************************************************************
 // Funciones.
@@ -90,7 +90,7 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
     uint32_t gpio_num = (uint32_t) arg;
     BaseType_t xHigherPriorityTaskWoken=pdFALSE;
 
-    estadoBotonesISR.messageType = POLL;
+    estadoBotonesISR.messageType = BUTTON_STATUS;
 
     ets_delay_us(5000); // Antirrebote SW "cutre". Por simplicidad lo dejamos así
     if (gpio_num == GPIO_NUM_25)    // Comprobamos si ha habido cambio del GPIO 25
@@ -212,7 +212,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 ESP_LOGI(TAG, "button poll request received: %s", booleano ? "true":"false");
 
                 mqtt_send_t poll;
-                poll.messageType = POLL;
+                poll.messageType = BUTTON_STATUS;
 
                 botonIzquierdo = gpio_get_level(GPIO_NUM_25);
                 botonDerecho   = gpio_get_level(GPIO_NUM_26);
@@ -339,7 +339,7 @@ static void mqtt_sender_task(void *pvParameters)
 		        msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
 		        ESP_LOGI(TAG, "PING sent successfully, msg_id=%d: %s", msg_id, buffer);
 		        break;
-		    case POLL:
+		    case BUTTON_STATUS:
 		        struct json_out out2 = JSON_OUT_BUF(buffer, sizeof(buffer)); // Inicializa la estructura que gestiona el buffer.
 		        bool boton1, boton2;
 		        boton1 = msg.payload[0] == '1' ? true : false;
