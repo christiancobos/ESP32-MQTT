@@ -520,3 +520,26 @@ void GUIPanel::on_Knob_3_valueChanged(double value)
 
     SendMessage_General(objeto_json);
 }
+
+void GUIPanel::on_checkBox_2_toggled(bool checked)
+{
+    // Crear mensaje MQTT
+    QJsonObject objeto_json;
+
+    if (checked)
+    {
+        ui->pushButton_6->setDisabled(true);
+        ui->pushButton_6->setHidden(true);
+
+        objeto_json["button_interrupt"] = true;
+    }
+    else
+    {
+        ui->pushButton_6->setEnabled(true);
+        ui->pushButton_6->setVisible(true);
+
+        objeto_json["button_interrupt"] = false;
+    }
+
+    SendMessage_General(objeto_json);
+}
