@@ -9,12 +9,12 @@
 #define MQTT_TOPIC_SUBSCRIBE_BASE      CONFIG_EXAMPLE_MQTT_TOPIC_SUBSCRIBE_BASE
 #define MQTT_TOPIC_PUBLISH_BASE  CONFIG_EXAMPLE_MQTT_TOPIC_PUBLISH_BASE
 
-
 //*****************************************************************************
 //      PROTOTIPOS DE FUNCIONES
 //*****************************************************************************
 
 esp_err_t mqtt_app_start(const char* url);
+void IRAM_ATTR gpio_isr_handler(void* arg);
 
 
 #endif //  __MQTT_H__

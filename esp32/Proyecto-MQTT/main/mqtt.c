@@ -16,6 +16,7 @@
 #include "mqtt_client.h"
 #include "driver/gpio.h"
 #include "adc_simple.h"
+#include <rom/ets_sys.h>
 
 //Include own project  headers
 #include "gpio_leds.h"
@@ -33,6 +34,9 @@
 #define ADC_TOPIC        "/adc_read"
 #define LAST_WILL_TOPIC  "/last_will"
 
+#define BOTON_IZQUIERDO  0u
+#define BOTON_DERECHO    1u
+
 #define LAST_WILL_LENGTH 26u
 
 #define ADC_SAMPLE_PERIOD 0.2f
@@ -43,7 +47,7 @@
 
 typedef enum{
     PING,
-    POLL,
+    BUTTON_STATUS,
     ADC_READ,
     LAST_WILL_MESSAGE
 }mqtt_sendType_t;
@@ -70,6 +74,8 @@ static TaskHandle_t adcTaskHandler = NULL;
 static QueueHandle_t sendQueueHandler=NULL;
 static uint8_t rgbPwmValues[3] = {0};
 static uint8_t binaryLEDValues[3] = {0};
+static bool botonIzquierdo, botonDerecho;
+static volatile mqtt_send_t estadoBotonesISR;
 
 //****************************************************************************
 // Funciones.
@@ -77,6 +83,31 @@ static uint8_t binaryLEDValues[3] = {0};
 
 static void mqtt_sender_task(void *pvParameters);
 static void adc_task(void *pvParameters);
+
+// ISR that will handle button async notification via MQTT.
+void IRAM_ATTR gpio_isr_handler(void* arg)
+{
+    uint32_t gpio_num = (uint32_t) arg;
+    BaseType_t xHigherPriorityTaskWoken=pdFALSE;
+
+    estadoBotonesISR.messageType = BUTTON_STATUS;
+
+    ets_delay_us(5000); // Antirrebote SW "cutre". Por simplicidad lo dejamos así
+    if (gpio_num == GPIO_NUM_25)    // Comprobamos si ha habido cambio del GPIO 25
+    {
+        botonIzquierdo = !botonIzquierdo;
+    }
+    else if (gpio_num == GPIO_NUM_26)   // Comprobamos si ha habido cambio del GPIO 26
+    {
+        botonDerecho = !botonDerecho;
+    }
+
+    estadoBotonesISR.payload[BOTON_IZQUIERDO] = botonIzquierdo ? '1' : '0';
+    estadoBotonesISR.payload[BOTON_DERECHO]   = botonDerecho   ? '1' : '0';
+
+    xQueueSendFromISR(sendQueueHandler, &estadoBotonesISR, &xHigherPriorityTaskWoken); // Se manda el estado de los botones.
+    if (xHigherPriorityTaskWoken) portYIELD_FROM_ISR();
+}
 
 
 // callback that will handle MQTT events. Will be called by  the MQTT internal task.
@@ -95,7 +126,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             sendQueueHandler = xQueueCreate(10, sizeof(mqtt_send_t));                        // Crea la cola para comunicar datos a la tarea de envío.
 
 
-            //Crea la tarea MQTT sennder
+            //Crea la tarea MQTT sender
             if (xTaskCreate(mqtt_sender_task, "mqtt_sender", 4096, NULL, 5, &senderTaskHandler) != pdPASS)
             {
                 while(1);
@@ -111,7 +142,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             last_will.messageType = LAST_WILL_MESSAGE;
 
             xQueueSend(sendQueueHandler, &last_will, portMAX_DELAY);
-
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -182,14 +212,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 ESP_LOGI(TAG, "button poll request received: %s", booleano ? "true":"false");
 
                 mqtt_send_t poll;
-                bool boton1, boton2;
-                poll.messageType = POLL;
+                poll.messageType = BUTTON_STATUS;
 
-                boton1 = gpio_get_level(GPIO_NUM_25);
-                boton2 = gpio_get_level(GPIO_NUM_26);
+                botonIzquierdo = gpio_get_level(GPIO_NUM_25);
+                botonDerecho   = gpio_get_level(GPIO_NUM_26);
 
-                poll.payload[0] = boton1 ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
-                poll.payload[1] = boton2 ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
+                poll.payload[0] = botonIzquierdo ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
+                poll.payload[1] = botonDerecho   ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
 
                 xQueueSend(sendQueueHandler, &poll, portMAX_DELAY);
             }
@@ -250,6 +279,30 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 GL_setRGB(rgbPwmValues);
             }
 
+            if(json_scanf(event->data, event->data_len, "{ button_interrupt: %B }", &booleano) == 1)
+            {
+                if (booleano)
+                {
+                    ESP_LOGI(TAG, "Button status notifies via interrupt");
+
+                    //Habilitación de interrupciones
+                    gpio_intr_enable(GPIO_NUM_25);
+                    gpio_intr_enable(GPIO_NUM_26);
+
+                    //Inicialización de estado de botones
+                    botonIzquierdo = !gpio_get_level(GPIO_NUM_25);
+                    botonDerecho   = !gpio_get_level(GPIO_NUM_26);
+                }
+                else
+                {
+                    ESP_LOGI(TAG, "Button status notifies via poll");
+
+                    //Deshabilitación de interrupciones
+                    gpio_intr_disable(GPIO_NUM_25);
+                    gpio_intr_disable(GPIO_NUM_26);
+                }
+            }
+
 
 
         }
@@ -286,7 +339,7 @@ static void mqtt_sender_task(void *pvParameters)
 		        msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
 		        ESP_LOGI(TAG, "PING sent successfully, msg_id=%d: %s", msg_id, buffer);
 		        break;
-		    case POLL:
+		    case BUTTON_STATUS:
 		        struct json_out out2 = JSON_OUT_BUF(buffer, sizeof(buffer)); // Inicializa la estructura que gestiona el buffer.
 		        bool boton1, boton2;
 		        boton1 = msg.payload[0] == '1' ? true : false;
