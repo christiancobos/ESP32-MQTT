@@ -496,6 +496,10 @@ void GUIPanel::on_Knob_valueChanged(double value)
     //Añade un campo "PWM_Rojo" al objeto JSON, con el valor del knob para el led ROJO.
     objeto_json["PWM_Rojo"]=int((value/100)*255);
 
+    // Añadimos la medida de los otros dos indicadores:
+    objeto_json["PWM_Verde"]=int((ui->Knob_2->value()/100)*255);
+    objeto_json["PWM_Azul"]=int((ui->Knob_3->value()/100)*255);
+
     SendMessage_General(objeto_json);
 }
 
@@ -507,6 +511,10 @@ void GUIPanel::on_Knob_2_valueChanged(double value)
     //Añade un campo "PWM_Verde" al objeto JSON, con el valor del knob para el led Verde.
     objeto_json["PWM_Verde"]=int((value/100)*255);
 
+    // Añadimos la medida de los otros dos indicadores:
+    objeto_json["PWM_Rojo"]=int((ui->Knob->value()/100)*255);
+    objeto_json["PWM_Azul"]=int((ui->Knob_3->value()/100)*255);
+
     SendMessage_General(objeto_json);
 }
 
@@ -517,6 +525,10 @@ void GUIPanel::on_Knob_3_valueChanged(double value)
 
     //Añade un campo "PWM_Azul" al objeto JSON, con el valor del knob para el led Azul.
     objeto_json["PWM_Azul"]=int((value/100)*255);
+
+    // Añadimos la medida de los otros dos indicadores:
+    objeto_json["PWM_Rojo"]=int((ui->Knob->value()/100)*255);
+    objeto_json["PWM_Verde"]=int((ui->Knob_2->value()/100)*255);
 
     SendMessage_General(objeto_json);
 }
