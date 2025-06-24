@@ -44,6 +44,8 @@
 
 #include "mqtt.h"
 #include "bluetooth.h"
+#include "ds1621driver.h"
+#include "i2c_master.h"
 
 
 //TAG para los mensajes de consola
@@ -51,6 +53,9 @@ static const char *TAG = "example";
 
 // Flag para la instalación de la rutina de interrupción.
 #define ESP_INTR_FLAG_DEFAULT 0
+
+#define I2C_MASTER_SCL_IO           27      /*!< GPIO number used for I2C master clock */
+#define I2C_MASTER_SDA_IO           26      /*!< GPIO number used for I2C master data  */
 
 
 /* Console command history can be stored to and loaded from a file.
@@ -192,12 +197,35 @@ void app_main(void)
 	}
 	ESP_ERROR_CHECK(ret);
 
+	// Inicializa el driver del I2C
+	// Utilizacion de los pines GPIO_NUM_26--> SDA GPIO_NUM_27--> SCL
+	ret = i2c_master_init(I2C_NUM_0, I2C_MASTER_SDA_IO , I2C_MASTER_SCL_IO, GPIO_PULLUP_ENABLE, false);
+	ESP_ERROR_CHECK(ret);
+
+	// CONFIGURACION SENSOR DS1621
+	ret = ds1621_i2c_master_init(0, I2C_NUM_0);
+	ESP_ERROR_CHECK(ret);
+	// DISPARO DE LA CONVERSI�N EN MODO CONTINUO DS1621
+	while(ds1621_config(DS1621_CTRL_POL_HIGH) != ESP_OK){
+		ESP_LOGE(TAG, "ERROR ds1621Config");
+		vTaskDelay(0.25 * configTICK_RATE_HZ);
+	}
+
+	ESP_LOGI(TAG, "DS1621 initialized");
+
+	while(ds1621_start_conversion()){
+		ESP_LOGE(TAG, "ERROR ds1621StartConvertion");
+		vTaskDelay(0.25 * configTICK_RATE_HZ);
+	}
+
+	ESP_LOGI(TAG, "DS1621 conversion done");
+
 	//Inicializa el GPIO
 	GL_initGPIO(); //Inicializa los pines de salida
 
 	//Inicializa los pines de entrada de los botones.
 	gpio_config_t io_conf = {
-	    .pin_bit_mask = (1ULL << GPIO_NUM_25) | (1ULL << GPIO_NUM_26) ,
+	    .pin_bit_mask = (1ULL << GPIO_NUM_25) | (1ULL << GPIO_NUM_14) ,
 	    .mode = GPIO_MODE_INPUT,
 	    .pull_up_en = GPIO_PULLUP_ENABLE,
 	    .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -207,13 +235,13 @@ void app_main(void)
 
     //Instalar rutina de tratamiento de interrupciones de GPIO.
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    //Solución EF41: Anclar rutina a los pines seleccionados para los botones (GPIO25 y GPIO26)
+    //Solución EF41: Anclar rutina a los pines seleccionados para los botones (GPIO25 y GPIO14)
     gpio_isr_handler_add(GPIO_NUM_25, gpio_isr_handler, (void*) GPIO_NUM_25);
-    gpio_isr_handler_add(GPIO_NUM_26, gpio_isr_handler, (void*) GPIO_NUM_26);
+    gpio_isr_handler_add(GPIO_NUM_14, gpio_isr_handler, (void*) GPIO_NUM_14);
 
     // Deshabilitación inicial de interrupciones
     gpio_intr_disable(GPIO_NUM_25);
-    gpio_intr_disable(GPIO_NUM_26);
+    gpio_intr_disable(GPIO_NUM_14);
 
 	//
 	adc_simple_init();

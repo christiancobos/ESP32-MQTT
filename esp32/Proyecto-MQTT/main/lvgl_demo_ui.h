@@ -12,6 +12,7 @@
 
 extern void ui_update_clock(uint8_t hout, uint8_t minute, uint8_t second );
 extern void ui_example_lvgl_demo_init(lv_disp_t *disp);
+extern void ui_set_indicator_value(float value);
 
 
 #endif /* MAIN_LVGL_DEMO_UI_H_ */
