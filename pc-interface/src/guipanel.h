@@ -59,6 +59,10 @@ private slots:
 
     void on_checkBox_2_toggled(bool checked);
 
+    void on_checkBox_3_toggled(bool checked);
+
+    void on_Counter_valueChanged(double value);
+
 private: // funciones privadas
 //    void pingDevice();
     void startClient();
@@ -74,6 +78,7 @@ private:
     bool connected;
     bool pingRequest;
     bool updatingPWMControlInternally;
+    bool updatingTemperatureControlInternally;
     QString suscribeRootTopic;
     QString publishRootTopic;
 
