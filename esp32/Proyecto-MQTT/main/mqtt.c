@@ -21,6 +21,8 @@
 //Include own project  headers
 #include "gpio_leds.h"
 #include "mqtt.h"
+#include "lvgl_demo_ui.h"
+#include "ds1621driver.h"
 
 //FROZEN JSON parsing/fotmatting library header
 #include "frozen.h"
@@ -29,10 +31,11 @@
 //      DEFINES
 //****************************************************************************
 
-#define PONG_TOPIC       "/pong"
-#define POLL_TOPIC       "/button_poll"
-#define ADC_TOPIC        "/adc_read"
-#define LAST_WILL_TOPIC  "/last_will"
+#define PONG_TOPIC        "/pong"
+#define POLL_TOPIC        "/button_poll"
+#define ADC_TOPIC         "/adc_read"
+#define LAST_WILL_TOPIC   "/last_will"
+#define TEMPERATURE_TOPIC "/temperature"
 
 #define BOTON_IZQUIERDO  0u
 #define BOTON_DERECHO    1u
@@ -49,7 +52,8 @@ typedef enum{
     PING,
     BUTTON_STATUS,
     ADC_READ,
-    LAST_WILL_MESSAGE
+    LAST_WILL_MESSAGE,
+	TEMPERATURE_READ
 }mqtt_sendType_t;
 
 typedef enum{
@@ -71,7 +75,9 @@ static const char *TAG = "MQTT_CLIENT";
 static esp_mqtt_client_handle_t client=NULL;
 static TaskHandle_t senderTaskHandler=NULL;
 static TaskHandle_t adcTaskHandler = NULL;
+static TaskHandle_t temperatureTaskHandler = NULL;
 static QueueHandle_t sendQueueHandler=NULL;
+static QueueHandle_t temperatureQueueHandler=NULL;
 static uint8_t rgbPwmValues[3] = {0};
 static uint8_t binaryLEDValues[3] = {0};
 static bool botonIzquierdo, botonDerecho;
@@ -83,6 +89,7 @@ static volatile mqtt_send_t estadoBotonesISR;
 
 static void mqtt_sender_task(void *pvParameters);
 static void adc_task(void *pvParameters);
+static void temperature_task(void *pvParameters);
 
 // ISR that will handle button async notification via MQTT.
 void IRAM_ATTR gpio_isr_handler(void* arg)
@@ -97,7 +104,7 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
     {
         botonIzquierdo = !botonIzquierdo;
     }
-    else if (gpio_num == GPIO_NUM_26)   // Comprobamos si ha habido cambio del GPIO 26
+    else if (gpio_num == GPIO_NUM_14)   // Comprobamos si ha habido cambio del GPIO 14
     {
         botonDerecho = !botonDerecho;
     }
@@ -123,8 +130,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             msg_id = esp_mqtt_client_subscribe(client, MQTT_TOPIC_SUBSCRIBE_BASE, 0);
             ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
-            sendQueueHandler = xQueueCreate(10, sizeof(mqtt_send_t));                        // Crea la cola para comunicar datos a la tarea de envío.
+            sendQueueHandler = xQueueCreate(10, sizeof(mqtt_send_t));  // Crea la cola para comunicar datos a la tarea de envío.
 
+            temperatureQueueHandler = xQueueCreate(10, sizeof(float)); // Crea la cola para comunicar habilitación y tiempo de lectura de temperatura.
 
             //Crea la tarea MQTT sender
             if (xTaskCreate(mqtt_sender_task, "mqtt_sender", 4096, NULL, 5, &senderTaskHandler) != pdPASS)
@@ -135,6 +143,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             // Crea la tarea de sensado del ADC.
             if (xTaskCreate( adc_task, "Adc", configMINIMAL_STACK_SIZE + (0.5 * configMINIMAL_STACK_SIZE), NULL, tskIDLE_PRIORITY+1, &adcTaskHandler)!=pdPASS){
                 while (1);
+            }
+
+            // Crea la tarea de sensado de temperatura.
+            if (xTaskCreate(temperature_task, "Temp", configMINIMAL_STACK_SIZE + (0.5 * configMINIMAL_STACK_SIZE), NULL, tskIDLE_PRIORITY + 1, &temperatureTaskHandler) != pdPASS)
+            {
+            	while (1);
             }
 
             // Enviamos mensaje de conexión en el topic de testamento para indicar a los clientes que la placa está conectada.
@@ -171,6 +185,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         	bool booleano;
         	uint8_t PWM_value;
+        	float temp_measurement_time;
 
         	if(json_scanf(event->data, event->data_len, "{ redLed: %B }", &booleano)==1)
         	{
@@ -215,7 +230,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 poll.messageType = BUTTON_STATUS;
 
                 botonIzquierdo = gpio_get_level(GPIO_NUM_25);
-                botonDerecho   = gpio_get_level(GPIO_NUM_26);
+                botonDerecho   = gpio_get_level(GPIO_NUM_14);
 
                 poll.payload[0] = botonIzquierdo ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
                 poll.payload[1] = botonDerecho   ? '0' : '1'; // Lógica invertida por tener resistencia pull-up
@@ -287,11 +302,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
                     //Habilitación de interrupciones
                     gpio_intr_enable(GPIO_NUM_25);
-                    gpio_intr_enable(GPIO_NUM_26);
+                    gpio_intr_enable(GPIO_NUM_14);
 
                     //Inicialización de estado de botones
                     botonIzquierdo = !gpio_get_level(GPIO_NUM_25);
-                    botonDerecho   = !gpio_get_level(GPIO_NUM_26);
+                    botonDerecho   = !gpio_get_level(GPIO_NUM_14);
                 }
                 else
                 {
@@ -299,9 +314,16 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
                     //Deshabilitación de interrupciones
                     gpio_intr_disable(GPIO_NUM_25);
-                    gpio_intr_disable(GPIO_NUM_26);
+                    gpio_intr_disable(GPIO_NUM_14);
                 }
             }
+
+            if(json_scanf(event->data, event->data_len, "{ temperature_read: %f }", &temp_measurement_time) == 1)
+			{
+				ESP_LOGI(TAG, "Lectura de temperatura: %s", temp_measurement_time > 0.0F ? "activada" : "desactivada");
+
+				xQueueSend(temperatureQueueHandler, &temp_measurement_time, portMAX_DELAY);
+			}
 
 
 
@@ -365,6 +387,14 @@ static void mqtt_sender_task(void *pvParameters)
                 msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 1, true);
                 ESP_LOGI(TAG, "Connection flag sent successfully, msg_id=%d: %s", msg_id, buffer);
 		        break;
+		    case TEMPERATURE_READ:
+		    	struct json_out out5 = JSON_OUT_BUF(buffer, sizeof(buffer));
+		    	float temperatura = atof(msg.payload);
+		    	json_printf(&out5, " { temperature: %f } ", temperatura);
+		    	snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, TEMPERATURE_TOPIC);
+		    	msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
+		    	ESP_LOGI(TAG, "Temperature read sent successfully, msg_id?%d; %s", msg_id, buffer);
+		    	break;
 
 		    default:
 		        break;
@@ -383,6 +413,30 @@ void adc_task(void *pvParameters){
         xQueueSend(sendQueueHandler, &adc_read, portMAX_DELAY);
         vTaskDelay((int)(ADC_SAMPLE_PERIOD*configTICK_RATE_HZ));
     }
+}
+
+static void temperature_task(void *pvParameters)
+{
+	mqtt_send_t temperature_read;
+	temperature_read.messageType = TEMPERATURE_READ;
+
+	float delay = portMAX_DELAY;
+	float delay_received, grados;
+
+	for (;;)
+	{
+		if (xQueueReceive(temperatureQueueHandler, &delay_received, delay) == pdTRUE)
+		{
+			delay = delay_received > 0.0f ? (delay_received-0.75f)*configTICK_RATE_HZ : portMAX_DELAY;
+		}
+		if (delay_received > 0.0f)
+		{
+			esp_err_t ret = ds1621_read_temperature_high_resolution(&grados);
+			sprintf(temperature_read.payload, "%f", grados);
+			xQueueSend(sendQueueHandler, &temperature_read, portMAX_DELAY);
+			ui_set_indicator_value((uint32_t)grados);
+		}
+	}
 }
 
 esp_err_t mqtt_app_start(const char* url)

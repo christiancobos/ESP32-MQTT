@@ -32,6 +32,7 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
     connected=false;                 // Todavía no hemos establecido la conexión con el servidor MQTT
     pingRequest = false;             // No se ha hecho solicitud de PING.
     updatingPWMControlInternally = false; // flag de actualización de controles de LED internos.
+    updatingTemperatureControlInternally = false; // Flag de actualización de controles de temperatura internos.
 
     // Se oculta el control PWM de los LED en el arranque
     ui->Knob->setHidden(true);
@@ -122,6 +123,7 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
 {
     bool previousblockinstate,checked;
     int  knobValue;
+    double measure_time;
     if (connected)
     {
         QJsonParseError error;
@@ -181,6 +183,15 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                     {
                         ui->statusLabel_2->setText("Conectado");
                     }
+                }
+            }
+            else if (topic == (publishRootTopic + "/temperature"))
+            {
+                QJsonValue entrada = objeto_json["temperature"];
+
+                if (entrada.isDouble())
+                {
+                    ui->label_9->setText(tr("%1 ºC").arg(QString::number(entrada.toDouble(), 'f', 3)));
                 }
             }
             else
@@ -277,6 +288,23 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                         ui->checkBox->setChecked(checked);
 
                         updatingPWMControlInternally = false;
+                    }
+                    else if ((keys[i] == "temperature_read") && (entrada.isDouble()))
+                    {
+                        updatingTemperatureControlInternally = true;
+                        measure_time = entrada.toDouble();
+
+                        if (measure_time <= 0.0f)
+                        {
+                            ui->checkBox_3->setChecked(false);
+                        }
+                        else
+                        {
+                            ui->checkBox_3->setChecked(true);
+
+                            ui->Counter->setValue(measure_time);
+                        }
+                        updatingTemperatureControlInternally = false;
                     }
                     else
                     {
@@ -552,6 +580,34 @@ void GUIPanel::on_checkBox_2_toggled(bool checked)
 
         objeto_json["button_interrupt"] = false;
     }
+
+    SendMessage_General(objeto_json);
+}
+
+void GUIPanel::on_checkBox_3_toggled(bool checked)
+{
+    QJsonObject objeto_json;
+
+    if (checked)
+    {
+        objeto_json["temperature_read"] = ui->Counter->value();
+    }
+    else
+    {
+        objeto_json["temperature_read"] = -1.0f;
+    }
+
+    SendMessage_General(objeto_json);
+}
+
+void GUIPanel::on_Counter_valueChanged(double value)
+{
+    QJsonObject objeto_json;
+
+    objeto_json["temperature_read"] = value;
+
+    if (updatingTemperatureControlInternally) // Para evitar que se envíe repetido un nuevo cambio en la checkbox cuando se está recibiendo el cambio por MQTT
+        return;
 
     SendMessage_General(objeto_json);
 }
