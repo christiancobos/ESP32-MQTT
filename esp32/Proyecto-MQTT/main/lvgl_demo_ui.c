@@ -8,6 +8,10 @@
 
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "clockwidget.h"
 
@@ -22,10 +26,20 @@ static lv_obj_t * lvMinute;
 static lv_obj_t * lvHour;
 static lv_obj_t * lvSecond ;
 
+// Semáforo para controlar la librería, no es thread-safe.
+static SemaphoreHandle_t lcdSemaphoreHandler;
+
+// Variables globales para los LED
+static lv_obj_t * led1; // LED rojo
+static lv_obj_t * led2; // LED azul
+static bool blueLedStatus;
+
 
 
 void ui_update_clock(uint8_t hour, uint8_t minute, uint8_t second )
 {
+	xSemaphoreTake(lcdSemaphoreHandler, portMAX_DELAY);
+
 	//Apply the limits.
 	minute=minute%60;
 	second=second%60;
@@ -47,10 +61,16 @@ void ui_update_clock(uint8_t hour, uint8_t minute, uint8_t second )
         lv_img_set_angle(  lvSecond, second*6*10);
         lv_obj_align(  lvSecond, LV_ALIGN_CENTER, 0, 0);
     }
+
+    xSemaphoreGive(lcdSemaphoreHandler);
 }
 
 void ui_example_lvgl_demo_init(lv_disp_t *disp)
 {
+	// Inicialización del semáforo:
+
+	lcdSemaphoreHandler = xSemaphoreCreateBinary(); // Se crea el semáforo pero no se libera hasta el final de la tarea
+
     lv_obj_t *scr = lv_disp_get_scr_act(disp);
 
 
@@ -150,25 +170,58 @@ void ui_example_lvgl_demo_init(lv_disp_t *disp)
     lv_obj_add_style(cont2, &style, 0);
 
     /* ****** crea 3 LEDs y los agrega al contenedor 2 */
-    lv_obj_t * led1  = lv_led_create(cont2);
+    led1  = lv_led_create(cont2);
     lv_obj_center(led1);
     lv_led_set_color(led1, lv_palette_main(LV_PALETTE_RED));
-    lv_led_on(led1);
+    lv_led_off(led1);
 
-    lv_obj_t * led2  = lv_led_create(cont2);
+    led2  = lv_led_create(cont2);
     lv_obj_center(led2);
     lv_led_set_color(led2, lv_palette_main(LV_PALETTE_BLUE));
-    lv_led_on(led2);
+    lv_led_off(led2);
+    blueLedStatus = false;
 
 
     lv_obj_t * led3  = lv_led_create(cont2);
     lv_obj_center(led3);
     lv_led_set_color(led3, lv_palette_main(LV_PALETTE_GREEN));
-    lv_led_on(led3);
+    lv_led_off(led3);
 
+    xSemaphoreGive(lcdSemaphoreHandler);
 }
 
 void ui_set_indicator_value(float value)
 {
+	xSemaphoreTake(lcdSemaphoreHandler, portMAX_DELAY);
 	lv_meter_set_indicator_value(meter, indic, value);
+	xSemaphoreGive(lcdSemaphoreHandler);
+}
+
+void ui_set_red_led_on(void)
+{
+	xSemaphoreTake(lcdSemaphoreHandler, portMAX_DELAY);
+	lv_led_on(led1);
+	xSemaphoreGive(lcdSemaphoreHandler);
+}
+
+void ui_set_red_led_off(void)
+{
+	xSemaphoreTake(lcdSemaphoreHandler, portMAX_DELAY);
+	lv_led_off(led1);
+	xSemaphoreGive(lcdSemaphoreHandler);
+}
+
+void ui_toggle_blue_led(void)
+{
+	xSemaphoreTake(lcdSemaphoreHandler, portMAX_DELAY);
+	if (blueLedStatus)
+	{
+		lv_led_off(led2);
+	}
+	else
+	{
+		lv_led_on(led2);
+	}
+	blueLedStatus = !blueLedStatus;
+	xSemaphoreGive(lcdSemaphoreHandler);
 }
