@@ -63,6 +63,8 @@ private slots:
 
     void on_Counter_valueChanged(double value);
 
+    void on_pushButton_8_clicked(void);
+
 private: // funciones privadas
 //    void pingDevice();
     void startClient();
@@ -79,6 +81,7 @@ private:
     bool pingRequest;
     bool updatingPWMControlInternally;
     bool updatingTemperatureControlInternally;
+    bool adcEnable;
     QString suscribeRootTopic;
     QString publishRootTopic;
 
