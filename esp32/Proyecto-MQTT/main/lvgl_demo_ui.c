@@ -9,7 +9,6 @@
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
 #include "freertos/semphr.h"
-#include "freertos/queue.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -69,7 +68,12 @@ void ui_example_lvgl_demo_init(lv_disp_t *disp)
 {
 	// Inicialización del semáforo:
 
-	lcdSemaphoreHandler = xSemaphoreCreateBinary(); // Se crea el semáforo pero no se libera hasta el final de la tarea
+	lcdSemaphoreHandler = xSemaphoreCreateMutex(); // Se crea el semáforo pero no se libera hasta el final de la tarea
+
+	if (lcdSemaphoreHandler == NULL)
+	{
+		while (1);
+	}
 
     lv_obj_t *scr = lv_disp_get_scr_act(disp);
 
