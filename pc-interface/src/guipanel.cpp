@@ -33,6 +33,7 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
     pingRequest = false;             // No se ha hecho solicitud de PING.
     updatingPWMControlInternally = false; // flag de actualización de controles de LED internos.
     updatingTemperatureControlInternally = false; // Flag de actualización de controles de temperatura internos.
+    adcEnable = false;                            // Flag de habilitación de lectura del ADC
 
     // Se oculta el control PWM de los LED en el arranque
     ui->Knob->setHidden(true);
@@ -305,6 +306,19 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                             ui->Counter->setValue(measure_time);
                         }
                         updatingTemperatureControlInternally = false;
+                    }
+                    else if ((keys[i] == "adc_enable") && (entrada.isBool()))
+                    {
+                        adcEnable = entrada.toBool();
+
+                        if (adcEnable)
+                        {
+                            ui->pushButton_8->setText("ENABLED");
+                        }
+                        else
+                        {
+                            ui->pushButton_8->setText("DISABLED");
+                        }
                     }
                     else
                     {
@@ -608,6 +622,26 @@ void GUIPanel::on_Counter_valueChanged(double value)
 
     if (updatingTemperatureControlInternally) // Para evitar que se envíe repetido un nuevo cambio en la checkbox cuando se está recibiendo el cambio por MQTT
         return;
+
+    SendMessage_General(objeto_json);
+}
+
+void GUIPanel::on_pushButton_8_clicked(void)
+{
+    QJsonObject objeto_json;
+
+    adcEnable = !adcEnable;
+
+    if (adcEnable)
+    {
+        ui->pushButton_8->setText("ENABLED");
+    }
+    else
+    {
+        ui->pushButton_8->setText("DISABLED");
+    }
+
+    objeto_json["adc_enable"] = adcEnable;
 
     SendMessage_General(objeto_json);
 }

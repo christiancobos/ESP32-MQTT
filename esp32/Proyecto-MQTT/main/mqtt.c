@@ -7,8 +7,8 @@
 //Include FreeRTOS headers
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/semphr.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 
 //Include ESP submodules headers.
 #include "esp_event.h"
@@ -78,6 +78,7 @@ static TaskHandle_t adcTaskHandler = NULL;
 static TaskHandle_t temperatureTaskHandler = NULL;
 static QueueHandle_t sendQueueHandler=NULL;
 static QueueHandle_t temperatureQueueHandler=NULL;
+static SemaphoreHandle_t adcSemaphoreHandler;
 static uint8_t rgbPwmValues[3] = {0};
 static uint8_t binaryLEDValues[3] = {0};
 static bool botonIzquierdo, botonDerecho;
@@ -134,6 +135,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
             temperatureQueueHandler = xQueueCreate(10, sizeof(float)); // Crea la cola para comunicar habilitación y tiempo de lectura de temperatura.
 
+            xSemaphoreTake(adcSemaphoreHandler, portMAX_DELAY);
+
+            if (adcSemaphoreHandler == NULL)
+            {
+            	while(1);
+            }
+
             //Crea la tarea MQTT sender
             if (xTaskCreate(mqtt_sender_task, "mqtt_sender", 4096, NULL, 5, &senderTaskHandler) != pdPASS)
             {
@@ -161,9 +169,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
             vTaskDelete(senderTaskHandler);
             vTaskDelete(adcTaskHandler);
+            vTaskDelete(temperatureTaskHandler);
             vQueueDelete(sendQueueHandler);
+            vQueueDelete(temperatureQueueHandler);
+            vSemaphoreDelete(adcSemaphoreHandler);
 
-            //Deber�amos destruir la tarea que env�a....
             break;
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
@@ -325,6 +335,27 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 				xQueueSend(temperatureQueueHandler, &temp_measurement_time, portMAX_DELAY);
 			}
 
+            if(json_scanf(event->data, event->data_len, "{ adc_enable: %B }", &booleano) == 1)
+            {
+				ESP_LOGI(TAG, "Lectura de ADC: %s", booleano ? "activada" : "desactivada");
+
+				if (booleano)
+				{
+					if (xSemaphoreGive(adcSemaphoreHandler) == pdPASS)
+					{
+						ui_set_red_led_on();
+					}
+
+				}
+				else
+				{
+					if (xSemaphoreTake(adcSemaphoreHandler, 0.2f*configTICK_RATE_HZ) == pdPASS)
+					{
+						ui_set_red_led_off();
+					}
+				}
+			}
+
 
 
         }
@@ -409,9 +440,12 @@ void adc_task(void *pvParameters){
 
     for(;;)
     {
+    	xSemaphoreTake(adcSemaphoreHandler, portMAX_DELAY);
+    	ui_toggle_blue_led();
         sprintf(adc_read.payload, "%u", adc_simple_read_raw());
         xQueueSend(sendQueueHandler, &adc_read, portMAX_DELAY);
         vTaskDelay((int)(ADC_SAMPLE_PERIOD*configTICK_RATE_HZ));
+        xSemaphoreGive(adcSemaphoreHandler);
     }
 }
 
@@ -446,6 +480,14 @@ esp_err_t mqtt_app_start(const char* url)
 	char last_will_message[LAST_WILL_LENGTH] = " { \"disconnected\": true } ";
 	char output_topic[100]; //string para el topic de TESTAMENTO.
 	snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, LAST_WILL_TOPIC);
+
+	adcSemaphoreHandler = xSemaphoreCreateBinary();
+	if (adcSemaphoreHandler == NULL)
+	{
+		printf("Error al inicializar el semáforo");
+		while(1);
+	}
+	xSemaphoreGive(adcSemaphoreHandler);
 
 
 	if (client==NULL){
