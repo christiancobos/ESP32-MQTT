@@ -31,6 +31,7 @@ static SemaphoreHandle_t lcdSemaphoreHandler;
 // Variables globales para los LED
 static lv_obj_t * led1; // LED rojo
 static lv_obj_t * led2; // LED azul
+static lv_obj_t * led3; // LED verde
 static bool blueLedStatus;
 
 
@@ -186,7 +187,7 @@ void ui_example_lvgl_demo_init(lv_disp_t *disp)
     blueLedStatus = false;
 
 
-    lv_obj_t * led3  = lv_led_create(cont2);
+    led3  = lv_led_create(cont2);
     lv_obj_center(led3);
     lv_led_set_color(led3, lv_palette_main(LV_PALETTE_GREEN));
     lv_led_off(led3);
@@ -227,5 +228,19 @@ void ui_toggle_blue_led(void)
 		lv_led_on(led2);
 	}
 	blueLedStatus = !blueLedStatus;
+	xSemaphoreGive(lcdSemaphoreHandler);
+}
+
+void ui_set_green_led_on(void)
+{
+	xSemaphoreTake(lcdSemaphoreHandler, portMAX_DELAY);
+	lv_led_on(led3);
+	xSemaphoreGive(lcdSemaphoreHandler);
+}
+
+void ui_set_green_led_off(void)
+{
+	xSemaphoreTake(lcdSemaphoreHandler, portMAX_DELAY);
+	lv_led_off(led3);
 	xSemaphoreGive(lcdSemaphoreHandler);
 }

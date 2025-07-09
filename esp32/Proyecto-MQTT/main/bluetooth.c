@@ -2,6 +2,8 @@
 #include "esp_event.h"
 #include "esp_log.h"
 //#include "comandos.h"
+#include "mqtt.h"
+#include "freertos/queue.h"
 
 #include "esp_bt.h"
 #include "esp_bt_main.h"
@@ -90,6 +92,10 @@ static void gap_callback_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_pa
 			{
 				case ESP_GAP_SEARCH_INQ_RES_EVT:
 				{
+					mqtt_send_t device_data;
+
+					device_data.messageType = BLUETOOTH_DEVICE;
+
 					char address[30];
 					snprintf(address,30, BT_BD_ADDR_STR, BT_BD_ADDR_HEX(param->scan_rst.bda));
 					 ESP_LOGW(TAG, "Device found (bda): %s", address);
@@ -99,14 +105,20 @@ static void gap_callback_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_pa
 					 ESP_LOG_BUFFER_HEXDUMP(TAG,param->scan_rst.ble_adv+param->scan_rst.adv_data_len,param->scan_rst.scan_rsp_len,ESP_LOG_WARN);
 
 
-
 //					// Scans for the "Complete name" (looking inside the payload buffer)
 					uint8_t len;
 					if (param->scan_rst.scan_rsp_len)
 					{
 						uint8_t *data = esp_ble_resolve_adv_data(param->scan_rst.ble_adv+param->scan_rst.adv_data_len, ESP_BLE_AD_TYPE_NAME_CMPL, &len);
 						ESP_LOGW(TAG, "len: %d, %.*s", len, len, data);
+						snprintf(device_data.payload, sizeof(device_data.payload), "%s;%d;%.*s", address, param->scan_rst.rssi, len, data);
 					}
+					else
+					{
+						snprintf(device_data.payload, sizeof(device_data.payload), "%s;%d;", address, param->scan_rst.rssi);
+					}
+
+					xQueueSend(sendQueueHandler, &device_data, portMAX_DELAY);
 
 					break;
 				}
@@ -241,7 +253,7 @@ esp_err_t bluetooth_init(void)
 {
     esp_err_t status;
 
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT)); //Vamos a utilizar solo el modo BLE, así que liberamos memoria del modo clásico
+    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT)); //Vamos a utilizar solo el modo BLE, asï¿½ que liberamos memoria del modo clï¿½sico
 
 	// Initialize BT controller to allocate task and other resource. 
 	esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
