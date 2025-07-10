@@ -66,6 +66,16 @@ GUIPanel::GUIPanel(QWidget *parent) :  // Constructor de la clase
     }
     m_curve_1->setRawSamples(xVal,yVal1,NMAX);
     ui->qwtPlot->replot();
+
+    // Inicializamos a deshabilitado el escaneo BLE:
+    scanEnable = false;
+
+    // Inicializamos la tabla que muestra los resultados del escaneo BLE:
+    ui->tableWidget->setColumnCount(3);
+    QStringList headers = { "MAC", "RSSI", "Nombre" };
+    ui->tableWidget->setHorizontalHeaderLabels(headers);
+    ui->tableWidget->horizontalHeader()->setStretchLastSection(true);
+    ui->tableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
 }
 
 GUIPanel::~GUIPanel() // Destructor de la clase
@@ -195,6 +205,27 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                     ui->label_9->setText(tr("%1 ºC").arg(QString::number(entrada.toDouble(), 'f', 3)));
                 }
             }
+            else if (topic == (publishRootTopic + "/bt_device"))
+            {
+                QJsonValue address = objeto_json["address"];
+                QJsonValue rssi    = objeto_json["rssi"];
+                QJsonValue nombre  = objeto_json["nombre"];
+
+                if (macToRowMap.contains(address.toString())) {
+                    // Actualizar fila existente
+                    int row = macToRowMap[address.toString()];
+                    ui->tableWidget->item(row, 1)->setText(QString::number(rssi.toInt()));
+                    ui->tableWidget->item(row, 2)->setText(nombre.toString());
+                } else {
+                    // Insertar nueva fila
+                    int row = ui->tableWidget->rowCount();
+                    ui->tableWidget->insertRow(row);
+                    ui->tableWidget->setItem(row, 0, new QTableWidgetItem(address.toString()));
+                    ui->tableWidget->setItem(row, 1, new QTableWidgetItem(QString::number(rssi.toInt())));
+                    ui->tableWidget->setItem(row, 2, new QTableWidgetItem(nombre.toString()));
+                    macToRowMap[address.toString()] = row;
+                }
+            }
             else
             {
                 QStringList keys = objeto_json.keys();
@@ -318,6 +349,19 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                         else
                         {
                             ui->pushButton_8->setText("DISABLED");
+                        }
+                    }
+                    else if ((keys[i] == "ble_scan") && (entrada.isBool()))
+                    {
+                        scanEnable = entrada.toBool();
+
+                        if (scanEnable)
+                        {
+                            ui->pushButton_9->setText("Scan ENABLED");
+                        }
+                        else
+                        {
+                            ui->pushButton_9->setText("Scan DISABLED");
                         }
                     }
                     else
@@ -642,6 +686,29 @@ void GUIPanel::on_pushButton_8_clicked(void)
     }
 
     objeto_json["adc_enable"] = adcEnable;
+
+    SendMessage_General(objeto_json);
+}
+
+void GUIPanel::on_pushButton_9_clicked(void)
+{
+    QJsonObject objeto_json;
+
+    scanEnable = !scanEnable;
+
+    if (scanEnable)
+    {
+        ui->pushButton_9->setText("Scan ENABLED");
+
+        ui->tableWidget->setRowCount(0);
+        macToRowMap.clear();
+    }
+    else
+    {
+        ui->pushButton_9->setText("Scan DISABLED");
+    }
+
+    objeto_json["ble_scan"] = scanEnable;
 
     SendMessage_General(objeto_json);
 }

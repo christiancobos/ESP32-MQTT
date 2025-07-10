@@ -18,6 +18,8 @@ extern void ui_set_indicator_value(float value);
 extern void ui_set_red_led_on(void);
 extern void ui_set_red_led_off(void);
 extern void ui_toggle_blue_led(void);
+extern void ui_set_green_led_on(void);
+extern void ui_set_green_led_off(void);
 
 
 #endif /* MAIN_LVGL_DEMO_UI_H_ */

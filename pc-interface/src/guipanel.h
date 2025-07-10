@@ -65,6 +65,8 @@ private slots:
 
     void on_pushButton_8_clicked(void);
 
+    void on_pushButton_9_clicked(void);
+
 private: // funciones privadas
 //    void pingDevice();
     void startClient();
@@ -82,8 +84,11 @@ private:
     bool updatingPWMControlInternally;
     bool updatingTemperatureControlInternally;
     bool adcEnable;
+    bool scanEnable;
     QString suscribeRootTopic;
     QString publishRootTopic;
+
+    QMap<QString, int> macToRowMap; // MAC -> Row index
 
     double xVal[NMAX];
     double yVal1[NMAX];

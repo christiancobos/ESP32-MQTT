@@ -23,6 +23,7 @@
 #include "mqtt.h"
 #include "lvgl_demo_ui.h"
 #include "ds1621driver.h"
+#include "bluetooth.h"
 
 //FROZEN JSON parsing/fotmatting library header
 #include "frozen.h"
@@ -31,41 +32,19 @@
 //      DEFINES
 //****************************************************************************
 
-#define PONG_TOPIC        "/pong"
-#define POLL_TOPIC        "/button_poll"
-#define ADC_TOPIC         "/adc_read"
-#define LAST_WILL_TOPIC   "/last_will"
-#define TEMPERATURE_TOPIC "/temperature"
+#define PONG_TOPIC             "/pong"
+#define POLL_TOPIC             "/button_poll"
+#define ADC_TOPIC              "/adc_read"
+#define LAST_WILL_TOPIC        "/last_will"
+#define TEMPERATURE_TOPIC      "/temperature"
+#define BLUETOOTH_DEVICE_TOPIC "/bt_device"
 
 #define BOTON_IZQUIERDO  0u
 #define BOTON_DERECHO    1u
 
-#define LAST_WILL_LENGTH 26u
+#define LAST_WILL_LENGTH   26u
 
 #define ADC_SAMPLE_PERIOD 0.2f
-
-//****************************************************************************
-//      TIPOS DE DATOS
-//****************************************************************************
-
-typedef enum{
-    PING,
-    BUTTON_STATUS,
-    ADC_READ,
-    LAST_WILL_MESSAGE,
-	TEMPERATURE_READ
-}mqtt_sendType_t;
-
-typedef enum{
-    LED_ROJO,
-    LED_VERDE,
-    LED_AZUL
-} rgb_colourIndex_t;
-
-typedef struct{
-    mqtt_sendType_t messageType;
-    char payload[128];
-}mqtt_send_t; // Tipo de datos para comunicar al hilo de envío de datos el tipo de mensaje y su payload.
 
 //****************************************************************************
 //      VARIABLES GLOBALES STATIC
@@ -76,13 +55,19 @@ static esp_mqtt_client_handle_t client=NULL;
 static TaskHandle_t senderTaskHandler=NULL;
 static TaskHandle_t adcTaskHandler = NULL;
 static TaskHandle_t temperatureTaskHandler = NULL;
-static QueueHandle_t sendQueueHandler=NULL;
 static QueueHandle_t temperatureQueueHandler=NULL;
 static SemaphoreHandle_t adcSemaphoreHandler;
 static uint8_t rgbPwmValues[3] = {0};
 static uint8_t binaryLEDValues[3] = {0};
 static bool botonIzquierdo, botonDerecho;
 static volatile mqtt_send_t estadoBotonesISR;
+
+
+//****************************************************************************
+//      VARIABLES COMPARTIDAS EXTERN
+//****************************************************************************
+
+QueueHandle_t sendQueueHandler=NULL;
 
 //****************************************************************************
 // Funciones.
@@ -356,6 +341,22 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 				}
 			}
 
+            if(json_scanf(event->data, event->data_len, "{ ble_scan: %B }", &booleano) == 1)
+            {
+            	if (booleano)
+            	{
+            		ESP_LOGI(TAG, "Inicio de escaneo BLE");
+            		bluetooth_start_scan();
+            		ui_set_green_led_on();
+            	}
+            	else
+            	{
+            		ESP_LOGI(TAG, "Fin de escaneo BLE");
+            		bluetooth_stop_scan();
+            		ui_set_green_led_off();
+            	}
+            }
+
 
 
         }
@@ -375,7 +376,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 static void mqtt_sender_task(void *pvParameters)
 {
-	char buffer[100]; //"buffer" para guardar el mensaje. Me debo asegurar que quepa...
+	char buffer[200]; //"buffer" para guardar el mensaje. Me debo asegurar que quepa...
 	char output_topic[100]; //string para el topic de salida.
 
 	while (1)
@@ -425,6 +426,28 @@ static void mqtt_sender_task(void *pvParameters)
 		    	snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, TEMPERATURE_TOPIC);
 		    	msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
 		    	ESP_LOGI(TAG, "Temperature read sent successfully, msg_id?%d; %s", msg_id, buffer);
+		    	break;
+		    case BLUETOOTH_DEVICE:
+		    	struct json_out out6 = JSON_OUT_BUF(buffer, sizeof(buffer));
+		    	char* address;
+		    	char* rssi;
+		    	char* nombre;
+
+		    	address = strtok(msg.payload, ";");
+		    	rssi    = strtok(NULL, ";");
+		    	nombre  = strtok(NULL, ";");
+
+		    	if (!nombre)
+		    	{
+		    	    json_printf(&out6," { address: \"%s\" , rssi: %s, nombre: %s } ", address, rssi, "\"Not available!\"");
+		    	}
+		    	else
+		    	{
+		    		json_printf(&out6, " { address: \"%s\", rssi: %s, nombre: %s } ", address, rssi, nombre);
+		    	}
+		    	snprintf(output_topic, sizeof(output_topic), "%s%s", MQTT_TOPIC_PUBLISH_BASE, BLUETOOTH_DEVICE_TOPIC);
+				msg_id = esp_mqtt_client_publish(client, output_topic, buffer, 0, 0, 0);
+				ESP_LOGI(TAG, "Device scan sent successfully, msg_id?%d; %s", msg_id, buffer);
 		    	break;
 
 		    default:
