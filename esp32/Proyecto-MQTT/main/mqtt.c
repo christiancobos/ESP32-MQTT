@@ -436,12 +436,10 @@ static void mqtt_sender_task(void *pvParameters)
 		    	address = strtok(msg.payload, ";");
 		    	rssi    = strtok(NULL, ";");
 		    	nombre  = strtok(NULL, ";");
-		    	ESP_LOGI(TAG, "Device scan sent successfully");
-		    	ESP_LOGI(TAG, "Los valores a imprimir son address: %s, rssi: %s, nombre: %s", address ? address : "NULO", rssi ? rssi : "NULO", nombre ? nombre : "NULO");
 
 		    	if (!nombre)
 		    	{
-		    	    json_printf(&out6," { address: \"%s\" , rssi: %s, nombre: %s } ", address, rssi, "\"Not avaliable!\"");
+		    	    json_printf(&out6," { address: \"%s\" , rssi: %s, nombre: %s } ", address, rssi, "\"Not available!\"");
 		    	}
 		    	else
 		    	{

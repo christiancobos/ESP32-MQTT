@@ -19,12 +19,6 @@ class GUIPanel;
 
 //QT4:QT_USE_NAMESPACE_SERIALPORT
 
-struct BLEDeviceInfo {
-    QString name;
-    QString mac;
-    int rssi;
-};
-
 class GUIPanel : public QWidget
 {
     Q_OBJECT
