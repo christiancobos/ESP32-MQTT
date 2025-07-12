@@ -321,6 +321,15 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
 
                         updatingPWMControlInternally = false;
                     }
+                    else if ((keys[i] == "button_interrupt") && (entrada.isBool()))
+                    {
+                        checked = entrada.toBool();
+
+                        ui->pushButton_6->setEnabled(!checked);
+                        ui->pushButton_6->setVisible(!checked);
+
+                        ui->checkBox_2->setChecked(checked);
+                    }
                     else if ((keys[i] == "temperature_read") && (entrada.isDouble()))
                     {
                         updatingTemperatureControlInternally = true;
@@ -329,6 +338,8 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                         if (measure_time <= 0.0f)
                         {
                             ui->checkBox_3->setChecked(false);
+
+                            ui->Counter->setValue(-measure_time);
                         }
                         else
                         {
@@ -358,6 +369,9 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                         if (scanEnable)
                         {
                             ui->pushButton_9->setText("Scan ENABLED");
+
+                            ui->tableWidget->setRowCount(0);
+                            macToRowMap.clear();
                         }
                         else
                         {
@@ -624,20 +638,9 @@ void GUIPanel::on_checkBox_2_toggled(bool checked)
     // Crear mensaje MQTT
     QJsonObject objeto_json;
 
-    if (checked)
-    {
-        ui->pushButton_6->setDisabled(true);
-        ui->pushButton_6->setHidden(true);
-
-        objeto_json["button_interrupt"] = true;
-    }
-    else
-    {
-        ui->pushButton_6->setEnabled(true);
-        ui->pushButton_6->setVisible(true);
-
-        objeto_json["button_interrupt"] = false;
-    }
+    ui->pushButton_6->setEnabled(!checked);
+    ui->pushButton_6->setVisible(!checked);
+    objeto_json["button_interrupt"] = checked;
 
     SendMessage_General(objeto_json);
 }
@@ -652,7 +655,7 @@ void GUIPanel::on_checkBox_3_toggled(bool checked)
     }
     else
     {
-        objeto_json["temperature_read"] = -1.0f;
+        objeto_json["temperature_read"] = -ui->Counter->value();
     }
 
     SendMessage_General(objeto_json);
@@ -662,10 +665,19 @@ void GUIPanel::on_Counter_valueChanged(double value)
 {
     QJsonObject objeto_json;
 
-    objeto_json["temperature_read"] = value;
+    if (ui->checkBox_3->isChecked() == false)
+    {
+        objeto_json["temperature_read"] = -value;
+    }
+    else
+    {
+        objeto_json["temperature_read"] = value;
+    }
 
-    if (updatingTemperatureControlInternally) // Para evitar que se envíe repetido un nuevo cambio en la checkbox cuando se está recibiendo el cambio por MQTT
+    if (updatingTemperatureControlInternally) // Para evitar que se envíe repetido un nuevo cambio en la checkbox cuando se está recibiendo el cambio por MQTT o se habilite la lectura por cambiar el valor.
+    {
         return;
+    }
 
     SendMessage_General(objeto_json);
 }
